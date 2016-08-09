@@ -78,15 +78,16 @@ static int boost_adjust_notify(struct notifier_block *nb, unsigned long val, voi
 	struct cpu_sync *s = &per_cpu(sync_info, cpu);
 	unsigned int b_min = s->boost_min;
 	unsigned int ib_min = s->input_boost_min;
-	unsigned int min;
+	unsigned int min, min_freq;
 
 	switch (val) {
 	case CPUFREQ_ADJUST:
 		if (!b_min && !ib_min)
 			break;
 
-		min = max(b_min, ib_min);
-
+		min_freq = max(b_min, ib_min);
+		min = min(min_freq, policy->max);
+		
 		pr_debug("CPU%u policy min before boost: %u kHz\n",
 			 cpu, policy->min);
 		pr_debug("CPU%u boost min: %u kHz\n", cpu, min);
@@ -241,8 +242,19 @@ static void do_input_boost(struct work_struct *work)
 		ret = cpufreq_get_policy(&policy, i);
 		if (ret)
 			continue;
+<<<<<<< HEAD
 		if (policy.cur >= input_boost_freq)
 			continue;
+=======
+		// ensure, touch boost freq does never exceed max scaling freq
+		if (input_boost_freq > policy.max)
+			freq = policy.max;
+		else
+			freq = input_boost_freq;
+
+		// if (policy.cur >= freq)
+		// 	continue;
+>>>>>>> 43ee248... cpufreq: cpuboost: Fix Multiple assignments
 
 		cancel_delayed_work_sync(&i_sync_info->input_boost_rem);
 		i_sync_info->input_boost_min = input_boost_freq;
