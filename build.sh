@@ -56,7 +56,7 @@ echo "                    "
 echo "                                   Compiling BlackReactor-Kernel                    "
 echo "                    "
 echo -e "$green ********************************************************************************************** $nocol"
-make onyx_mm_defconfig
+make onyx_mm-perf_defconfig
 make -j64
 if ! [ -a $KERN_IMG ];
 then
@@ -64,7 +64,7 @@ echo -e "$red Kernel Compilation failed! Fix the errors! $nocol"
 exit 1
 fi
 strip_modules
-block_ads
+#block_ads
 zipping
 }
 
