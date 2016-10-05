@@ -86,3 +86,4 @@ GTAGS
 \#*#
 build_test.sh
 *.img
+*.zip
