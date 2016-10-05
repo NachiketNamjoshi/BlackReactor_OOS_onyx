@@ -87,4 +87,5 @@ GTAGS
 build_test.sh
 *.img
 *.zip
-zipping/onyx/zImage
+./zipping/onyx/zImage
+./zipping/common/*
