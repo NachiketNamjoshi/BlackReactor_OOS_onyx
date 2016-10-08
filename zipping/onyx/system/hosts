@@ -30720,6 +30720,7 @@
 127.0.0.1 ads.cos.com
 127.0.0.1 ads.cosmosmagazine.com
 127.0.0.1 adscpm.com
+127.0.0.1 adscpm.com
 127.0.0.1 ads.cpsgsoftware.com
 127.0.0.1 ads.cpxcenter.com
 127.0.0.1 ads.crakmedia.com
@@ -30895,7 +30896,6 @@
 127.0.0.1 adserver1-images.backbeatmedia.com
 127.0.0.1 adserver1-images.backbeatmedia.com
 127.0.0.1 adserver1.mindshare.de
-127.0.0.1 adserver1.mokono.com
 127.0.0.1 adserver1.ogilvy-interactive.de
 127.0.0.1 adserver1.ogilvy-interactive.de
 127.0.0.1 adserver1.realtracker.com
@@ -33274,7 +33274,6 @@
 127.0.0.1 affiliates.cupidplc.com
 127.0.0.1 affiliates.de
 127.0.0.1 affiliates.deluxepass.com
-127.0.0.1 affiliates.devilfishpartners.com
 127.0.0.1 affiliates.digitalriver.com
 127.0.0.1 affiliates.eblastengine.com
 127.0.0.1 affiliates.esellerate.net
@@ -33952,10 +33951,14 @@
 127.0.0.1 api28.webovernet.com
 127.0.0.1 api.2easydroid.com
 127.0.0.1 api2.playhaven.com
+127.0.0.1 api2.testrequest.info
 127.0.0.1 api2.thesearchagency.net
 127.0.0.1 api31.thetrafficstat.net
+127.0.0.1 api3.testrequest.info
 127.0.0.1 api3.thesearchagency.net
+127.0.0.1 api4.testrequest.info
 127.0.0.1 api4.thesearchagency.net
+127.0.0.1 api5.testrequest.info
 127.0.0.1 api5.thesearchagency.net
 127.0.0.1 api6.thesearchagency.net
 127.0.0.1 api7.thesearchagency.net
@@ -34054,6 +34057,7 @@
 127.0.0.1 api.taplytics.com
 127.0.0.1 api.taps.io
 127.0.0.1 api.target.smi2.net
+127.0.0.1 api.testrequest.info
 127.0.0.1 api.thetrafficstat.net
 127.0.0.1 api.trak.io
 127.0.0.1 api.tweetmeme.com
@@ -40932,6 +40936,7 @@
 127.0.0.1 cpatrackkee.com
 127.0.0.1 cpatrackr.com
 127.0.0.1 cpaway.afftrack.com
+127.0.0.1 cpayard.com
 127.0.0.1 cpays.com
 127.0.0.1 cpays.com
 127.0.0.1 cpcadnet.com
@@ -42812,7 +42817,6 @@
 127.0.0.1 eosesd.org
 127.0.0.1 ep73e.voluumtrk.com
 127.0.0.1 e.performancerevenues.com
-127.0.0.1 epiccash.com
 127.0.0.1 epicgameads.com
 127.0.0.1 epidm.edgesuite.net
 127.0.0.1 e-planning.net
@@ -45935,7 +45939,6 @@
 127.0.0.1 immassets.s3.amazonaws.com
 127.0.0.1 immediate.mob-alerts15.com
 127.0.0.1 i-mobile.co.jp
-127.0.0.1 i.mol.im
 127.0.0.1 imonitor.dhgate.com
 127.0.0.1 imonitor.nethost.cz
 127.0.0.1 imonitor.nethost.cz
@@ -47016,7 +47019,6 @@
 127.0.0.1 ld.you2mail.com
 127.0.0.1 lead.adsender.us
 127.0.0.1 leadads.go2jump.org
-127.0.0.1 leadaffiliates.com
 127.0.0.1 lead-analytics.nl
 127.0.0.1 lea-danielson.us
 127.0.0.1 leadback.advertising.com
@@ -47043,6 +47045,7 @@
 127.0.0.1 leads.383media.com
 127.0.0.1 leads.demandbase.com
 127.0.0.1 leads.ohecampus.com
+127.0.0.1 leadtrackgo.com
 127.0.0.1 leadtracking.plumvoice.com
 127.0.0.1 leadzupc.com
 127.0.0.1 leanne-atwood.us
@@ -47186,7 +47189,6 @@
 127.0.0.1 linkexchange.net
 127.0.0.1 linkexchange.nl
 127.0.0.1 linkexchange.org
-127.0.0.1 linkexchange.ru
 127.0.0.1 linkexchange.ru
 127.0.0.1 link.hello-discount.com
 127.0.0.1 link.huffingtonpost.com
@@ -55557,6 +55559,7 @@
 127.0.0.1 trklnks.com
 127.0.0.1 trk.mailtoward.com
 127.0.0.1 trk.m.libero.it
+127.0.0.1 trk.mobile-setting.com
 127.0.0.1 trk.pswec.com
 127.0.0.1 trk.rrcpm.com
 127.0.0.1 trk.sele.co
@@ -55654,6 +55657,7 @@
 127.0.0.1 tvlistings3.zap2it.com
 127.0.0.1 tvlistings4.zap2it.com
 127.0.0.1 tv.livejasmin.com
+127.0.0.1 tvmtracker.com
 127.0.0.1 tvoy-mir.justclick.ru
 127.0.0.1 tvseriesfinale.us.intellitxt.com
 127.0.0.1 tv.sohu.com
@@ -61670,6 +61674,7 @@
 127.0.0.1 www.cpatrac.com
 127.0.0.1 www.cpatrackkee.com
 127.0.0.1 www.cpatrackr.com
+127.0.0.1 www.cpayard.com
 127.0.0.1 www.cpd8.net
 127.0.0.1 www.cpmaffiliation.com
 127.0.0.1 www.cpm.biz
@@ -62338,6 +62343,7 @@
 127.0.0.1 www.leadformix.com
 127.0.0.1 www.leadhound.com
 127.0.0.1 www.leadlander.com
+127.0.0.1 www.leadtrackgo.com
 127.0.0.1 www.lea-riser.us
 127.0.0.1 www.legitfreecounters.com
 127.0.0.1 www.lfstmedia.com
