@@ -86,9 +86,6 @@ zipping() {
 # make new zip
 cp $KERN_IMG $OUT_DIR/zImage
 cp $MODULES_DIR/*.ko $OUT_DIR/modules/
-cd $OUT_DIR/modules/
-mkdir pronto
-mv wlan.ko pronto/pronto_wlan.ko
 cd $OUT_DIR
 zip -r BlackReactor-onyx-$REACTOR_VERSION-$(date +"%Y%m%d")-$(date +"%H%M%S").zip *
 
