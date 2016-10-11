@@ -19,6 +19,9 @@
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
 #include <linux/boot_mode.h>
+#ifdef CONFIG_FORCE_FAST_CHARGE
+#include <linux/fastchg.h>
+#endif
 
 #include "core.h"
 #include "dwc3_otg.h"
@@ -586,7 +589,14 @@ static int dwc3_otg_set_power(struct usb_phy *phy, unsigned mA)
 
 	if (dotg->charger->max_power == mA)
 		return 0;
-
+ #ifdef CONFIG_FORCE_FAST_CHARGE
+ 	if (force_fast_charge > 0 && mA > 0) {
+ 		mA = FAST_CHG_MAX;
+ 		pr_info("USB fast charging is ON\n");
+ 	} else {
+ 		pr_info("USB fast charging is OFF\n");
+ 	}
+#endif
 	dev_info(phy->dev, "Avail curr from USB = %u\n", mA);
 #ifdef VENDOR_EDIT
 	if(get_boot_mode() == MSM_BOOT_MODE__RF) {
