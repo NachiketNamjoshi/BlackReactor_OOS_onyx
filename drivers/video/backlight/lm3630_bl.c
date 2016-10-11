@@ -418,6 +418,7 @@ static void lm3630_backlight_unregister(struct lm3630_chip_data *pchip)
 	int ret;
 	struct lm3630_chip_data *pchip = lm3630_pchip;
 	pr_debug("%s: bl=%d\n", __func__,bl_level);
+
 #ifdef VENDOR_EDIT
 
 /*Mobile Phone Software Dept.Driver, 2014/04/28  Add for add log for 14001 black screen */
