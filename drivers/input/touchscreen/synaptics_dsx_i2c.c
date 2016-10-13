@@ -4640,7 +4640,7 @@ static int fb_notifier_callback(struct notifier_block *p,
  * modules.
  */
 static int synaptics_rmi4_probe(struct i2c_client *client,
-                                const struct i2c_device_id *dev_id)
+		const struct i2c_device_id *dev_id)
 {
     int retval;
     unsigned char attr_count;
@@ -4929,7 +4929,7 @@ static void synaptics_oneplus_func(struct work_struct *work)
 
 
 static int synaptics_rmi4_probe_oneplus(struct i2c_client *client,
-                                        const struct i2c_device_id *dev_id)
+		const struct i2c_device_id *dev_id)
 {
     optimize_data.workqueue = create_workqueue("optimize_workqueue");
     INIT_DELAYED_WORK(&(optimize_data.work), synaptics_oneplus_func);
