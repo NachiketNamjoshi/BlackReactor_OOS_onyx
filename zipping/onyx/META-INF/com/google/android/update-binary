@@ -145,6 +145,12 @@ mount -o remount,rw /system;
 ui_print "* Copying 00BlackReactor...";
 cp -f /tmp/anykernel/system/00BlackReactor /system/etc/init.d/00BlackReactor;
 chmod 777 /system/etc/init.d/00BlackReactor;
+mount -o remount,rw /data;
+cd /data;
+if [ ! -d BlackReactor ]; then
+	ui_print " * Making Directories.."
+	mkdir BlackReactor;
+fi;
 ui_print "* Adding Ad-blocker..."
 rm -rf /system/etc/hosts
 cp -f /tmp/anykernel/system/hosts /system/etc/hosts;
