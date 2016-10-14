@@ -2061,11 +2061,13 @@ int mdss_dsi_panel_init(struct device_node *node,
 		pinfo->cont_splash_enabled = false;
 	/* 2013-12-09 Add begin for disable continous display for ftm, rf, wlan mode */
 #ifdef VENDOR_EDIT
-	if (cmd_cfg_cont_splash)
+	if (cmd_cfg_cont_splash){
 		cont_splash_enabled = of_property_read_bool(node,
 				"qcom,cont-splash-enabled");
-	else
+	}
+	else {
 		cont_splash_enabled = false;
+	}
 
 		if ((MSM_BOOT_MODE__FACTORY == get_boot_mode()) ||
 			(MSM_BOOT_MODE__RF == get_boot_mode()) ||
