@@ -29,12 +29,12 @@ nocol='\033[0m'
 KERNEL_DIR=$PWD
 KERN_IMG=$KERNEL_DIR/arch/arm/boot/zImage-dtb
 OUT_DIR=$KERNEL_DIR/zipping/onyx
-REACTOR_VERSION="OOS-beta-1.3"
+REACTOR_VERSION="OOS-beta-1.4"
 MODULES_DIR=$KERNEL_DIR/zipping/common
-STRIP="/home/nachiket/android/onyx/kernel/toolchains/Linaro/arm-linux-androideabi-6.1-linaro/bin/arm-linux-androideabi-strip"
+STRIP="/home/nachiket/android/onyx/kernel/toolchains/Linaro/arm-linux-androideabi-4.9/bin/arm-linux-androideabi-strip"
 # Device Spceifics
 export ARCH=arm
-export CROSS_COMPILE="/home/nachiket/android/onyx/kernel/toolchains/Linaro/arm-linux-androideabi-6.1-linaro/bin/arm-linux-androideabi-"
+export CROSS_COMPILE="/home/nachiket/android/onyx/kernel/toolchains/Linaro/arm-linux-androideabi-4.9/bin/arm-linux-androideabi-"
 export KBUILD_BUILD_USER="nachiket"
 export KBUILD_BUILD_HOST="reactor"
 
