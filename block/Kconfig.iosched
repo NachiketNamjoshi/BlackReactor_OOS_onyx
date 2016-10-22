@@ -118,8 +118,6 @@ choice
 	config DEFAULT_CFQ
 		bool "CFQ" if IOSCHED_CFQ=y
 
-<<<<<<< HEAD
-=======
 	config DEFAULT_FIOPS
 		bool "FIOPS" if IOSCHED_FIOPS=y
 
@@ -133,7 +131,6 @@ choice
 		  any workload. It also tries to guarantee low latency to
 		  interactive and soft real-time applications.
 
->>>>>>> 2af46fa... block: fiops ioscheduler core
 	config DEFAULT_NOOP
 		bool "No-op"
 
@@ -143,13 +140,9 @@ config DEFAULT_IOSCHED
 	string
 	default "deadline" if DEFAULT_DEADLINE
 	default "row" if DEFAULT_ROW
-<<<<<<< HEAD
-	default "cfq" if DEFAULT_CFQ
-=======
 	default "bfq" if DEFAULT_BFQ
 	default "cfq" if DEFAULT_CFQ
 	default "fiops" if DEFAULT_FIOPS
->>>>>>> 2af46fa... block: fiops ioscheduler core
 	default "noop" if DEFAULT_NOOP
 
 endmenu
