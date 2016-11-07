@@ -29,7 +29,7 @@ nocol='\033[0m'
 KERNEL_DIR=$PWD
 KERN_IMG=$KERNEL_DIR/arch/arm/boot/zImage-dtb
 OUT_DIR=$KERNEL_DIR/zipping/onyx
-REACTOR_VERSION="OOS-Stable-0.1"
+REACTOR_VERSION="OOS-Stable-0.2"
 MODULES_DIR=$KERNEL_DIR/zipping/common
 STRIP="/home/nachiket/android/onyx/kernel/toolchains/Linaro/arm-linux-androideabi-4.9/bin/arm-linux-androideabi-strip"
 # Device Spceifics
