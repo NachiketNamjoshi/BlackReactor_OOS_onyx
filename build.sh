@@ -31,10 +31,10 @@ KERN_IMG=$KERNEL_DIR/arch/arm/boot/zImage-dtb
 OUT_DIR=$KERNEL_DIR/zipping/onyx
 REACTOR_VERSION="OOS-Stable-0.2"
 MODULES_DIR=$KERNEL_DIR/zipping/common
-STRIP="/home/nachiket/android/onyx/kernel/toolchains/Linaro/arm-linux-androideabi-4.9/bin/arm-linux-androideabi-strip"
+STRIP="/home/nachiket/Android/android-ndk-r13/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/bin/arm-linux-androideabi-strip"
 # Device Spceifics
 export ARCH=arm
-export CROSS_COMPILE="/home/nachiket/android/onyx/kernel/toolchains/Linaro/arm-linux-androideabi-4.9/bin/arm-linux-androideabi-"
+export CROSS_COMPILE="/home/nachiket/Android/android-ndk-r13/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/bin/arm-linux-androideabi-"
 export KBUILD_BUILD_USER="nachiket"
 export KBUILD_BUILD_HOST="reactor"
 
