@@ -90,3 +90,4 @@ build_test.sh
 /zipping/onyx/zImage
 /zipping/common/*.zip
 shit
+*.bc
