@@ -31,7 +31,7 @@
 			qcom,pause-lo = <0>;
 			qcom,ramp-step-ms = <100>;
 			qcom,start-idx = <0>;
-			qcom,turn-off-delay-ms = <500>;
+			qcom,turn-off-delay-ms = <10>;
 			qcom,use-blink;
 		};
 
@@ -50,7 +50,7 @@
 			qcom,pause-lo = <0>;
 			qcom,ramp-step-ms = <100>;
 			qcom,start-idx = <10>;
-			qcom,turn-off-delay-ms = <500>;
+			qcom,turn-off-delay-ms = <10>;
 			qcom,use-blink;
 		};
 
@@ -68,7 +68,7 @@
 			qcom,pause-lo = <0>;
 			qcom,ramp-step-ms = <100>;
 			qcom,start-idx = <20>;
-			qcom,turn-off-delay-ms = <500>;
+			qcom,turn-off-delay-ms = <10>;
 			qcom,use-blink;
 		};
 	};
