@@ -923,9 +923,9 @@ static int taiko_set_compander(struct snd_kcontrol *kcontrol,
 	if (comp == COMPANDER_1 &&
 			taiko->comp_enabled[comp] == 1) {
 		/* Wavegen to 5 msec */
-		snd_soc_write(codec, TAIKO_A_RX_HPH_CNP_WG_CTL, 0xDA);
-		snd_soc_write(codec, TAIKO_A_RX_HPH_CNP_WG_TIME, 0x15);
-		snd_soc_write(codec, TAIKO_A_RX_HPH_BIAS_WG_OCP, 0x2A);
+		snd_soc_write(codec, TAIKO_A_RX_HPH_CNP_WG_CTL, 0xDB);
+		snd_soc_write(codec, TAIKO_A_RX_HPH_CNP_WG_TIME, 0x2A);
+		snd_soc_write(codec, TAIKO_A_RX_HPH_BIAS_WG_OCP, 0x15);
 
 		/* Enable Chopper */
 		snd_soc_update_bits(codec,
@@ -938,8 +938,8 @@ static int taiko_set_compander(struct snd_kcontrol *kcontrol,
 			taiko->comp_enabled[comp] == 0) {
 		/* Wavegen to 20 msec */
 		snd_soc_write(codec, TAIKO_A_RX_HPH_CNP_WG_CTL, 0xDB);
-		snd_soc_write(codec, TAIKO_A_RX_HPH_CNP_WG_TIME, 0x58);
-		snd_soc_write(codec, TAIKO_A_RX_HPH_BIAS_WG_OCP, 0x1A);
+		snd_soc_write(codec, TAIKO_A_RX_HPH_CNP_WG_TIME, 0x2A);
+		snd_soc_write(codec, TAIKO_A_RX_HPH_BIAS_WG_OCP, 0x1F);
 
 		/* Disable CHOPPER block */
 		snd_soc_update_bits(codec,
