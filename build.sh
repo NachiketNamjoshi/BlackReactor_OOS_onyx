@@ -87,7 +87,7 @@ zipping() {
 cp $KERN_IMG $OUT_DIR/zImage
 cp $MODULES_DIR/*.ko $OUT_DIR/modules/
 cd $OUT_DIR
-zip -r BlackReactor-onyx-$REACTOR_VERSION-$(date +"%Y%m%d")-$(date +"%H%M%S").zip *
+zip -r -9 BlackReactor-onyx-$REACTOR_VERSION-$(date +"%Y%m%d")-$(date +"%H%M%S").zip *
 
 }
 
