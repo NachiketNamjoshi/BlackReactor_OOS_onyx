@@ -1210,696 +1210,698 @@ static int _ce_setup_hash_direct(struct qce_device *pce_dev,
     if (use_pipe_key)
         auth_cfg |= 1 << CRYPTO_USE_PIPE_KEY_AUTH;
 go_proc:
-    /* write seg_cfg */
-    writel_relaxed(auth_cfg, pce_dev->iobase + CRYPTO_AUTH_SEG_CFG_REG);
-    /* write auth seg_size   */
-    writel_relaxed(sreq->size, pce_dev->iobase + CRYPTO_AUTH_SEG_SIZE_REG);
 
-    /* write auth_seg_start   */
-    writel_relaxed(0, pce_dev->iobase + CRYPTO_AUTH_SEG_START_REG);
+	 /* write seg_cfg */
+	writel_relaxed(auth_cfg, pce_dev->iobase + CRYPTO_AUTH_SEG_CFG_REG);
+	/* write auth seg_size   */
+	writel_relaxed(sreq->size, pce_dev->iobase + CRYPTO_AUTH_SEG_SIZE_REG);
 
-    /* reset encr seg_cfg   */
-    writel_relaxed(0, pce_dev->iobase + CRYPTO_ENCR_SEG_CFG_REG);
+	/* write auth_seg_start   */
+	writel_relaxed(0, pce_dev->iobase + CRYPTO_AUTH_SEG_START_REG);
 
-    /* write seg_size   */
-    writel_relaxed(sreq->size, pce_dev->iobase + CRYPTO_SEG_SIZE_REG);
+	/* reset encr seg_cfg   */
+	writel_relaxed(0, pce_dev->iobase + CRYPTO_ENCR_SEG_CFG_REG);
 
-    writel_relaxed(pce_dev->reg.crypto_cfg_le, (pce_dev->iobase +
-                   CRYPTO_CONFIG_REG));
-    /* issue go to crypto   */
-    if (use_hw_key == false)
-        writel_relaxed(((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP)),
-                       pce_dev->iobase + CRYPTO_GOPROC_REG);
-    else
-        writel_relaxed(((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP)),
-                       pce_dev->iobase + CRYPTO_GOPROC_QC_KEY_REG);
-    /*
-     * Ensure previous instructions (setting the GO register)
-     * was completed before issuing a DMA transfer request
-     */
-    mb();
-    return 0;
+	/* write seg_size   */
+	writel_relaxed(sreq->size, pce_dev->iobase + CRYPTO_SEG_SIZE_REG);
+
+	writel_relaxed(pce_dev->reg.crypto_cfg_le, (pce_dev->iobase +
+							CRYPTO_CONFIG_REG));
+	/* issue go to crypto   */
+	if (use_hw_key == false)
+		writel_relaxed(((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP) |
+				(1 << CRYPTO_CLR_CNTXT)),
+				pce_dev->iobase + CRYPTO_GOPROC_REG);
+	else
+		writel_relaxed(((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP)),
+				pce_dev->iobase + CRYPTO_GOPROC_QC_KEY_REG);
+	/*
+	 * Ensure previous instructions (setting the GO register)
+	 * was completed before issuing a DMA transfer request
+	 */
+	mb();
+	return 0;
 }
 
 static int _ce_setup_aead_direct(struct qce_device *pce_dev,
                                  struct qce_req *q_req, uint32_t totallen_in, uint32_t coffset)
 {
-    int32_t authk_size_in_word = SHA_HMAC_KEY_SIZE/sizeof(uint32_t);
-    int i;
-    uint32_t mackey32[SHA_HMAC_KEY_SIZE/sizeof(uint32_t)] = {0};
-    uint32_t a_cfg;
-    uint32_t enckey32[(MAX_CIPHER_KEY_SIZE*2)/sizeof(uint32_t)] = {0};
-    uint32_t enciv32[MAX_IV_LENGTH/sizeof(uint32_t)] = {0};
-    uint32_t enck_size_in_word = 0;
-    uint32_t enciv_in_word;
-    uint32_t key_size;
-    uint32_t ivsize = q_req->ivsize;
-    uint32_t encr_cfg;
+	int32_t authk_size_in_word = SHA_HMAC_KEY_SIZE/sizeof(uint32_t);
+	int i;
+	uint32_t mackey32[SHA_HMAC_KEY_SIZE/sizeof(uint32_t)] = {0};
+	uint32_t a_cfg;
+	uint32_t enckey32[(MAX_CIPHER_KEY_SIZE*2)/sizeof(uint32_t)] = {0};
+	uint32_t enciv32[MAX_IV_LENGTH/sizeof(uint32_t)] = {0};
+	uint32_t enck_size_in_word = 0;
+	uint32_t enciv_in_word;
+	uint32_t key_size;
+	uint32_t ivsize = q_req->ivsize;
+	uint32_t encr_cfg;
 
 
-    /* clear status */
-    writel_relaxed(0, pce_dev->iobase + CRYPTO_STATUS_REG);
+	/* clear status */
+	writel_relaxed(0, pce_dev->iobase + CRYPTO_STATUS_REG);
 
-    writel_relaxed(pce_dev->reg.crypto_cfg_be, (pce_dev->iobase +
-                   CRYPTO_CONFIG_REG));
-    /*
-     * Ensure previous instructions (setting the CONFIG register)
-     * was completed before issuing starting to set other config register
-     * This is to ensure the configurations are done in correct endian-ness
-     * as set in the CONFIG registers
-     */
-    mb();
+	writel_relaxed(pce_dev->reg.crypto_cfg_be, (pce_dev->iobase +
+							CRYPTO_CONFIG_REG));
+	/*
+	 * Ensure previous instructions (setting the CONFIG register)
+	 * was completed before issuing starting to set other config register
+	 * This is to ensure the configurations are done in correct endian-ness
+	 * as set in the CONFIG registers
+	 */
+	mb();
 
-    key_size = q_req->encklen;
-    enck_size_in_word = key_size/sizeof(uint32_t);
+	key_size = q_req->encklen;
+	enck_size_in_word = key_size/sizeof(uint32_t);
 
-    switch (q_req->alg) {
+	switch (q_req->alg) {
 
-    case CIPHER_ALG_DES:
+	case CIPHER_ALG_DES:
 
-        switch (q_req->mode) {
-        case QCE_MODE_ECB:
-            encr_cfg = pce_dev->reg.encr_cfg_des_ecb;
-            break;
-        case QCE_MODE_CBC:
-            encr_cfg = pce_dev->reg.encr_cfg_des_cbc;
-            break;
-        default:
-            return -EINVAL;
-        }
+		switch (q_req->mode) {
+		case QCE_MODE_ECB:
+			encr_cfg = pce_dev->reg.encr_cfg_des_ecb;
+			break;
+		case QCE_MODE_CBC:
+			encr_cfg = pce_dev->reg.encr_cfg_des_cbc;
+			break;
+		default:
+			return -EINVAL;
+		}
 
-        enciv_in_word = 2;
-        break;
+		enciv_in_word = 2;
+		break;
 
-    case CIPHER_ALG_3DES:
+	case CIPHER_ALG_3DES:
 
-        switch (q_req->mode) {
-        case QCE_MODE_ECB:
-            encr_cfg =  pce_dev->reg.encr_cfg_3des_ecb;
-            break;
-        case QCE_MODE_CBC:
-            encr_cfg = pce_dev->reg.encr_cfg_3des_cbc;
-            break;
-        default:
-            return -EINVAL;
-        }
+		switch (q_req->mode) {
+		case QCE_MODE_ECB:
+			encr_cfg =  pce_dev->reg.encr_cfg_3des_ecb;
+			break;
+		case QCE_MODE_CBC:
+			encr_cfg = pce_dev->reg.encr_cfg_3des_cbc;
+			break;
+		default:
+			return -EINVAL;
+		}
 
-        enciv_in_word = 2;
+		enciv_in_word = 2;
 
-        break;
+		break;
 
-    case CIPHER_ALG_AES:
+	case CIPHER_ALG_AES:
 
-        switch (q_req->mode) {
-        case QCE_MODE_ECB:
-            if (key_size == AES128_KEY_SIZE)
-                encr_cfg = pce_dev->reg.encr_cfg_aes_ecb_128;
-            else if (key_size  == AES256_KEY_SIZE)
-                encr_cfg = pce_dev->reg.encr_cfg_aes_ecb_256;
-            else
-                return -EINVAL;
-            break;
-        case QCE_MODE_CBC:
-            if (key_size == AES128_KEY_SIZE)
-                encr_cfg = pce_dev->reg.encr_cfg_aes_cbc_128;
-            else if (key_size  == AES256_KEY_SIZE)
-                encr_cfg = pce_dev->reg.encr_cfg_aes_cbc_256;
-            else
-                return -EINVAL;
-            break;
-        default:
-            return -EINVAL;
-        }
+		switch (q_req->mode) {
+		case QCE_MODE_ECB:
+			if (key_size == AES128_KEY_SIZE)
+				encr_cfg = pce_dev->reg.encr_cfg_aes_ecb_128;
+			else if (key_size  == AES256_KEY_SIZE)
+				encr_cfg = pce_dev->reg.encr_cfg_aes_ecb_256;
+			else
+				return -EINVAL;
+			break;
+		case QCE_MODE_CBC:
+			if (key_size == AES128_KEY_SIZE)
+				encr_cfg = pce_dev->reg.encr_cfg_aes_cbc_128;
+			else if (key_size  == AES256_KEY_SIZE)
+				encr_cfg = pce_dev->reg.encr_cfg_aes_cbc_256;
+			else
+				return -EINVAL;
+			break;
+		default:
+		return -EINVAL;
+		}
 
-        enciv_in_word = 4;
-        break;
+		enciv_in_word = 4;
+		break;
 
-    default:
-        return -EINVAL;
-    }
-
-
-    pce_dev->mode = q_req->mode;
+	default:
+		return -EINVAL;
+	}
 
 
-    /* write CNTR0_IV0_REG */
-    if (q_req->mode !=  QCE_MODE_ECB) {
-        _byte_stream_to_net_words(enciv32, q_req->iv, ivsize);
-        for (i = 0; i < enciv_in_word; i++)
-            writel_relaxed(enciv32[i], pce_dev->iobase +
-                           (CRYPTO_CNTR0_IV0_REG + i * sizeof(uint32_t)));
-    }
-
-    /*
-     * write encr key
-     * do not use  hw key or pipe key
-     */
-    _byte_stream_to_net_words(enckey32, q_req->enckey, key_size);
-    for (i = 0; i < enck_size_in_word; i++)
-        writel_relaxed(enckey32[i], pce_dev->iobase +
-                       (CRYPTO_ENCR_KEY0_REG + i * sizeof(uint32_t)));
-
-    /* write encr seg cfg */
-    if (q_req->dir == QCE_ENCRYPT)
-        encr_cfg |= (1 << CRYPTO_ENCODE);
-    writel_relaxed(encr_cfg, pce_dev->iobase + CRYPTO_ENCR_SEG_CFG_REG);
-
-    /* we only support sha1-hmac at this point */
-    _byte_stream_to_net_words(mackey32, q_req->authkey,
-                              q_req->authklen);
-    for (i = 0; i < authk_size_in_word; i++)
-        writel_relaxed(mackey32[i], pce_dev->iobase +
-                       (CRYPTO_AUTH_KEY0_REG + i * sizeof(uint32_t)));
-
-    for (i = 0; i < 5; i++)
-        writel_relaxed(_std_init_vector_sha1[i], pce_dev->iobase +
-                       (CRYPTO_AUTH_IV0_REG + i * sizeof(uint32_t)));
-
-    /* write auth_bytecnt 0/1, start with 0 */
-    writel_relaxed(0, pce_dev->iobase + CRYPTO_AUTH_BYTECNT0_REG);
-    writel_relaxed(0, pce_dev->iobase + CRYPTO_AUTH_BYTECNT1_REG);
-
-    /* write encr seg size    */
-    writel_relaxed(q_req->cryptlen, pce_dev->iobase +
-                   CRYPTO_ENCR_SEG_SIZE_REG);
-
-    /* write encr start   */
-    writel_relaxed(coffset & 0xffff, pce_dev->iobase +
-                   CRYPTO_ENCR_SEG_START_REG);
-
-    a_cfg = (CRYPTO_AUTH_MODE_HMAC << CRYPTO_AUTH_MODE) |
-            (CRYPTO_AUTH_SIZE_SHA1 << CRYPTO_AUTH_SIZE) |
-            (1 << CRYPTO_LAST) | (1 << CRYPTO_FIRST) |
-            (CRYPTO_AUTH_ALG_SHA << CRYPTO_AUTH_ALG);
-
-    if (q_req->dir == QCE_ENCRYPT)
-        a_cfg |= (CRYPTO_AUTH_POS_AFTER << CRYPTO_AUTH_POS);
-    else
-        a_cfg |= (CRYPTO_AUTH_POS_BEFORE << CRYPTO_AUTH_POS);
-
-    /* write auth seg_cfg */
-    writel_relaxed(a_cfg, pce_dev->iobase + CRYPTO_AUTH_SEG_CFG_REG);
-
-    /* write auth seg_size   */
-    writel_relaxed(totallen_in, pce_dev->iobase + CRYPTO_AUTH_SEG_SIZE_REG);
-
-    /* write auth_seg_start   */
-    writel_relaxed(0, pce_dev->iobase + CRYPTO_AUTH_SEG_START_REG);
+	pce_dev->mode = q_req->mode;
 
 
-    /* write seg_size   */
-    writel_relaxed(totallen_in, pce_dev->iobase + CRYPTO_SEG_SIZE_REG);
+	/* write CNTR0_IV0_REG */
+	if (q_req->mode !=  QCE_MODE_ECB) {
+		_byte_stream_to_net_words(enciv32, q_req->iv, ivsize);
+		for (i = 0; i < enciv_in_word; i++)
+			writel_relaxed(enciv32[i], pce_dev->iobase +
+				(CRYPTO_CNTR0_IV0_REG + i * sizeof(uint32_t)));
+	}
+
+	/*
+	 * write encr key
+	 * do not use  hw key or pipe key
+	 */
+	_byte_stream_to_net_words(enckey32, q_req->enckey, key_size);
+	for (i = 0; i < enck_size_in_word; i++)
+		writel_relaxed(enckey32[i], pce_dev->iobase +
+				(CRYPTO_ENCR_KEY0_REG + i * sizeof(uint32_t)));
+
+	/* write encr seg cfg */
+	if (q_req->dir == QCE_ENCRYPT)
+		encr_cfg |= (1 << CRYPTO_ENCODE);
+	writel_relaxed(encr_cfg, pce_dev->iobase + CRYPTO_ENCR_SEG_CFG_REG);
+
+	/* we only support sha1-hmac at this point */
+	_byte_stream_to_net_words(mackey32, q_req->authkey,
+					q_req->authklen);
+	for (i = 0; i < authk_size_in_word; i++)
+		writel_relaxed(mackey32[i], pce_dev->iobase +
+			(CRYPTO_AUTH_KEY0_REG + i * sizeof(uint32_t)));
+
+	for (i = 0; i < 5; i++)
+		writel_relaxed(_std_init_vector_sha1[i], pce_dev->iobase +
+				(CRYPTO_AUTH_IV0_REG + i * sizeof(uint32_t)));
+
+	/* write auth_bytecnt 0/1, start with 0 */
+	writel_relaxed(0, pce_dev->iobase + CRYPTO_AUTH_BYTECNT0_REG);
+	writel_relaxed(0, pce_dev->iobase + CRYPTO_AUTH_BYTECNT1_REG);
+
+	/* write encr seg size    */
+	writel_relaxed(q_req->cryptlen, pce_dev->iobase +
+			CRYPTO_ENCR_SEG_SIZE_REG);
+
+	/* write encr start   */
+	writel_relaxed(coffset & 0xffff, pce_dev->iobase +
+			CRYPTO_ENCR_SEG_START_REG);
+
+	a_cfg = (CRYPTO_AUTH_MODE_HMAC << CRYPTO_AUTH_MODE) |
+			(CRYPTO_AUTH_SIZE_SHA1 << CRYPTO_AUTH_SIZE) |
+			(1 << CRYPTO_LAST) | (1 << CRYPTO_FIRST) |
+			(CRYPTO_AUTH_ALG_SHA << CRYPTO_AUTH_ALG);
+
+	if (q_req->dir == QCE_ENCRYPT)
+		a_cfg |= (CRYPTO_AUTH_POS_AFTER << CRYPTO_AUTH_POS);
+	else
+		a_cfg |= (CRYPTO_AUTH_POS_BEFORE << CRYPTO_AUTH_POS);
+
+	/* write auth seg_cfg */
+	writel_relaxed(a_cfg, pce_dev->iobase + CRYPTO_AUTH_SEG_CFG_REG);
+
+	/* write auth seg_size   */
+	writel_relaxed(totallen_in, pce_dev->iobase + CRYPTO_AUTH_SEG_SIZE_REG);
+
+	/* write auth_seg_start   */
+	writel_relaxed(0, pce_dev->iobase + CRYPTO_AUTH_SEG_START_REG);
 
 
-    writel_relaxed(pce_dev->reg.crypto_cfg_le, (pce_dev->iobase +
+	/* write seg_size   */
+	writel_relaxed(totallen_in, pce_dev->iobase + CRYPTO_SEG_SIZE_REG);
 
-                   CRYPTO_CONFIG_REG));
-    /* issue go to crypto   */
-    writel_relaxed(((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP)),
-                   pce_dev->iobase + CRYPTO_GOPROC_REG);
-    /*
-     * Ensure previous instructions (setting the GO register)
-     * was completed before issuing a DMA transfer request
-     */
-    mb();
-    return 0;
+
+	writel_relaxed(pce_dev->reg.crypto_cfg_le, (pce_dev->iobase +
+
+							CRYPTO_CONFIG_REG));
+	/* issue go to crypto   */
+	writel_relaxed(((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP) |
+				(1 << CRYPTO_CLR_CNTXT)),
+				pce_dev->iobase + CRYPTO_GOPROC_REG);
+	/*
+	 * Ensure previous instructions (setting the GO register)
+	 * was completed before issuing a DMA transfer request
+	 */
+	mb();
+	return 0;
 };
 
 static int _ce_setup_cipher_direct(struct qce_device *pce_dev,
                                    struct qce_req *creq, uint32_t totallen_in, uint32_t coffset)
 {
-    uint32_t enckey32[(MAX_CIPHER_KEY_SIZE * 2)/sizeof(uint32_t)] = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-    };
-    uint32_t enciv32[MAX_IV_LENGTH / sizeof(uint32_t)] = {
-        0, 0, 0, 0
-    };
-    uint32_t enck_size_in_word = 0;
-    uint32_t key_size;
-    bool use_hw_key = false;
-    bool use_pipe_key = false;
-    uint32_t encr_cfg = 0;
-    uint32_t ivsize = creq->ivsize;
-    int i;
+	uint32_t enckey32[(MAX_CIPHER_KEY_SIZE * 2)/sizeof(uint32_t)] = {
+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+	uint32_t enciv32[MAX_IV_LENGTH / sizeof(uint32_t)] = {
+			0, 0, 0, 0};
+	uint32_t enck_size_in_word = 0;
+	uint32_t key_size;
+	bool use_hw_key = false;
+	bool use_pipe_key = false;
+	uint32_t encr_cfg = 0;
+	uint32_t ivsize = creq->ivsize;
+	int i;
 
-    /* clear status */
-    writel_relaxed(0, pce_dev->iobase + CRYPTO_STATUS_REG);
+	/* clear status */
+	writel_relaxed(0, pce_dev->iobase + CRYPTO_STATUS_REG);
 
-    writel_relaxed(pce_dev->reg.crypto_cfg_be, (pce_dev->iobase +
-                   CRYPTO_CONFIG_REG));
-    /*
-     * Ensure previous instructions (setting the CONFIG register)
-     * was completed before issuing starting to set other config register
-     * This is to ensure the configurations are done in correct endian-ness
-     * as set in the CONFIG registers
-     */
-    mb();
+	writel_relaxed(pce_dev->reg.crypto_cfg_be, (pce_dev->iobase +
+							CRYPTO_CONFIG_REG));
+	/*
+	 * Ensure previous instructions (setting the CONFIG register)
+	 * was completed before issuing starting to set other config register
+	 * This is to ensure the configurations are done in correct endian-ness
+	 * as set in the CONFIG registers
+	 */
+	mb();
 
-    if (creq->mode == QCE_MODE_XTS)
-        key_size = creq->encklen/2;
-    else
-        key_size = creq->encklen;
+	if (creq->mode == QCE_MODE_XTS)
+		key_size = creq->encklen/2;
+	else
+		key_size = creq->encklen;
 
-    if ((creq->flags & QCRYPTO_CTX_USE_HW_KEY) == QCRYPTO_CTX_USE_HW_KEY) {
-        use_hw_key = true;
-    } else {
-        if ((creq->flags & QCRYPTO_CTX_USE_PIPE_KEY) ==
-                QCRYPTO_CTX_USE_PIPE_KEY)
-            use_pipe_key = true;
-    }
-    if ((use_pipe_key == false) && (use_hw_key == false)) {
-        _byte_stream_to_net_words(enckey32, creq->enckey, key_size);
-        enck_size_in_word = key_size/sizeof(uint32_t);
-    }
-    if ((creq->op == QCE_REQ_AEAD) && (creq->mode == QCE_MODE_CCM)) {
-        uint32_t authklen32 = creq->encklen/sizeof(uint32_t);
-        uint32_t noncelen32 = MAX_NONCE/sizeof(uint32_t);
-        uint32_t nonce32[MAX_NONCE/sizeof(uint32_t)] = {0, 0, 0, 0};
-        uint32_t auth_cfg = 0;
+	if ((creq->flags & QCRYPTO_CTX_USE_HW_KEY) == QCRYPTO_CTX_USE_HW_KEY) {
+		use_hw_key = true;
+	} else {
+		if ((creq->flags & QCRYPTO_CTX_USE_PIPE_KEY) ==
+					QCRYPTO_CTX_USE_PIPE_KEY)
+			use_pipe_key = true;
+	}
+	if ((use_pipe_key == false) && (use_hw_key == false)) {
+		_byte_stream_to_net_words(enckey32, creq->enckey, key_size);
+		enck_size_in_word = key_size/sizeof(uint32_t);
+	}
+	if ((creq->op == QCE_REQ_AEAD) && (creq->mode == QCE_MODE_CCM)) {
+		uint32_t authklen32 = creq->encklen/sizeof(uint32_t);
+		uint32_t noncelen32 = MAX_NONCE/sizeof(uint32_t);
+		uint32_t nonce32[MAX_NONCE/sizeof(uint32_t)] = {0, 0, 0, 0};
+		uint32_t auth_cfg = 0;
 
-        /* Clear auth_ivn, auth_keyn registers  */
-        for (i = 0; i < 16; i++) {
-            writel_relaxed(0, (pce_dev->iobase +
-                               (CRYPTO_AUTH_IV0_REG + i*sizeof(uint32_t))));
-            writel_relaxed(0, (pce_dev->iobase +
-                               (CRYPTO_AUTH_KEY0_REG + i*sizeof(uint32_t))));
-        }
-        /* write auth_bytecnt 0/1/2/3, start with 0 */
-        for (i = 0; i < 4; i++)
-            writel_relaxed(0, pce_dev->iobase +
-                           CRYPTO_AUTH_BYTECNT0_REG +
-                           i * sizeof(uint32_t));
-        /* write nonce */
-        _byte_stream_to_net_words(nonce32, creq->nonce, MAX_NONCE);
-        for (i = 0; i < noncelen32; i++)
-            writel_relaxed(nonce32[i], pce_dev->iobase +
-                           CRYPTO_AUTH_INFO_NONCE0_REG +
-                           (i*sizeof(uint32_t)));
+		/* Clear auth_ivn, auth_keyn registers  */
+		for (i = 0; i < 16; i++) {
+			writel_relaxed(0, (pce_dev->iobase +
+				(CRYPTO_AUTH_IV0_REG + i*sizeof(uint32_t))));
+			writel_relaxed(0, (pce_dev->iobase +
+				(CRYPTO_AUTH_KEY0_REG + i*sizeof(uint32_t))));
+		}
+		/* write auth_bytecnt 0/1/2/3, start with 0 */
+		for (i = 0; i < 4; i++)
+			writel_relaxed(0, pce_dev->iobase +
+						CRYPTO_AUTH_BYTECNT0_REG +
+						i * sizeof(uint32_t));
+		/* write nonce */
+		_byte_stream_to_net_words(nonce32, creq->nonce, MAX_NONCE);
+		for (i = 0; i < noncelen32; i++)
+			writel_relaxed(nonce32[i], pce_dev->iobase +
+				CRYPTO_AUTH_INFO_NONCE0_REG +
+					(i*sizeof(uint32_t)));
 
-        if (creq->authklen ==  AES128_KEY_SIZE)
-            auth_cfg = pce_dev->reg.auth_cfg_aes_ccm_128;
-        else {
-            if (creq->authklen ==  AES256_KEY_SIZE)
-                auth_cfg = pce_dev->reg.auth_cfg_aes_ccm_256;
-        }
-        if (creq->dir == QCE_ENCRYPT)
-            auth_cfg |= (CRYPTO_AUTH_POS_BEFORE << CRYPTO_AUTH_POS);
-        else
-            auth_cfg |= (CRYPTO_AUTH_POS_AFTER << CRYPTO_AUTH_POS);
-        auth_cfg |= ((creq->authsize - 1) << CRYPTO_AUTH_SIZE);
+		if (creq->authklen ==  AES128_KEY_SIZE)
+			auth_cfg = pce_dev->reg.auth_cfg_aes_ccm_128;
+		else {
+			if (creq->authklen ==  AES256_KEY_SIZE)
+				auth_cfg = pce_dev->reg.auth_cfg_aes_ccm_256;
+		}
+		if (creq->dir == QCE_ENCRYPT)
+			auth_cfg |= (CRYPTO_AUTH_POS_BEFORE << CRYPTO_AUTH_POS);
+		else
+			auth_cfg |= (CRYPTO_AUTH_POS_AFTER << CRYPTO_AUTH_POS);
+		auth_cfg |= ((creq->authsize - 1) << CRYPTO_AUTH_SIZE);
 
-        if (use_hw_key == true)	{
-            auth_cfg |= (1 << CRYPTO_USE_HW_KEY_AUTH);
-        } else {
-            auth_cfg &= ~(1 << CRYPTO_USE_HW_KEY_AUTH);
-            /* write auth key */
-            for (i = 0; i < authklen32; i++)
-                writel_relaxed(enckey32[i], pce_dev->iobase +
-                               CRYPTO_AUTH_KEY0_REG + (i*sizeof(uint32_t)));
-        }
-        writel_relaxed(auth_cfg, pce_dev->iobase +
-                       CRYPTO_AUTH_SEG_CFG_REG);
-        if (creq->dir == QCE_ENCRYPT)
-            writel_relaxed(totallen_in, pce_dev->iobase +
-                           CRYPTO_AUTH_SEG_SIZE_REG);
-        else
-            writel_relaxed((totallen_in - creq->authsize),
-                           pce_dev->iobase + CRYPTO_AUTH_SEG_SIZE_REG);
-        writel_relaxed(0, pce_dev->iobase + CRYPTO_AUTH_SEG_START_REG);
-    } else {
-        if (creq->op != QCE_REQ_AEAD)
-            writel_relaxed(0, pce_dev->iobase +
-                           CRYPTO_AUTH_SEG_CFG_REG);
-    }
-    /*
-     * Ensure previous instructions (write to all AUTH registers)
-     * was completed before accessing a register that is not in
-     * in the same 1K range.
-     */
-    mb();
-    switch (creq->mode) {
-    case QCE_MODE_ECB:
-        if (key_size == AES128_KEY_SIZE)
-            encr_cfg = pce_dev->reg.encr_cfg_aes_ecb_128;
-        else
-            encr_cfg = pce_dev->reg.encr_cfg_aes_ecb_256;
-        break;
-    case QCE_MODE_CBC:
-        if (key_size == AES128_KEY_SIZE)
-            encr_cfg = pce_dev->reg.encr_cfg_aes_cbc_128;
-        else
-            encr_cfg = pce_dev->reg.encr_cfg_aes_cbc_256;
-        break;
-    case QCE_MODE_XTS:
-        if (key_size == AES128_KEY_SIZE)
-            encr_cfg = pce_dev->reg.encr_cfg_aes_xts_128;
-        else
-            encr_cfg = pce_dev->reg.encr_cfg_aes_xts_256;
-        break;
-    case QCE_MODE_CCM:
-        if (key_size == AES128_KEY_SIZE)
-            encr_cfg = pce_dev->reg.encr_cfg_aes_ccm_128;
-        else
-            encr_cfg = pce_dev->reg.encr_cfg_aes_ccm_256;
-        break;
-    case QCE_MODE_CTR:
-    default:
-        if (key_size == AES128_KEY_SIZE)
-            encr_cfg = pce_dev->reg.encr_cfg_aes_ctr_128;
-        else
-            encr_cfg = pce_dev->reg.encr_cfg_aes_ctr_256;
-        break;
-    }
-    pce_dev->mode = creq->mode;
+		if (use_hw_key == true)	{
+			auth_cfg |= (1 << CRYPTO_USE_HW_KEY_AUTH);
+		} else {
+			auth_cfg &= ~(1 << CRYPTO_USE_HW_KEY_AUTH);
+			/* write auth key */
+			for (i = 0; i < authklen32; i++)
+				writel_relaxed(enckey32[i], pce_dev->iobase +
+				CRYPTO_AUTH_KEY0_REG + (i*sizeof(uint32_t)));
+		}
+		writel_relaxed(auth_cfg, pce_dev->iobase +
+						CRYPTO_AUTH_SEG_CFG_REG);
+		if (creq->dir == QCE_ENCRYPT)
+			writel_relaxed(totallen_in, pce_dev->iobase +
+						CRYPTO_AUTH_SEG_SIZE_REG);
+		else
+			writel_relaxed((totallen_in - creq->authsize),
+				pce_dev->iobase + CRYPTO_AUTH_SEG_SIZE_REG);
+		writel_relaxed(0, pce_dev->iobase + CRYPTO_AUTH_SEG_START_REG);
+	} else {
+		if (creq->op != QCE_REQ_AEAD)
+			writel_relaxed(0, pce_dev->iobase +
+						CRYPTO_AUTH_SEG_CFG_REG);
+	}
+	/*
+	 * Ensure previous instructions (write to all AUTH registers)
+	 * was completed before accessing a register that is not in
+	 * in the same 1K range.
+	 */
+	mb();
+	switch (creq->mode) {
+	case QCE_MODE_ECB:
+		if (key_size == AES128_KEY_SIZE)
+			encr_cfg = pce_dev->reg.encr_cfg_aes_ecb_128;
+		else
+			encr_cfg = pce_dev->reg.encr_cfg_aes_ecb_256;
+		break;
+	case QCE_MODE_CBC:
+		if (key_size == AES128_KEY_SIZE)
+			encr_cfg = pce_dev->reg.encr_cfg_aes_cbc_128;
+		else
+			encr_cfg = pce_dev->reg.encr_cfg_aes_cbc_256;
+		break;
+	case QCE_MODE_XTS:
+		if (key_size == AES128_KEY_SIZE)
+			encr_cfg = pce_dev->reg.encr_cfg_aes_xts_128;
+		else
+			encr_cfg = pce_dev->reg.encr_cfg_aes_xts_256;
+		break;
+	case QCE_MODE_CCM:
+		if (key_size == AES128_KEY_SIZE)
+			encr_cfg = pce_dev->reg.encr_cfg_aes_ccm_128;
+		else
+			encr_cfg = pce_dev->reg.encr_cfg_aes_ccm_256;
+		break;
+	case QCE_MODE_CTR:
+	default:
+		if (key_size == AES128_KEY_SIZE)
+			encr_cfg = pce_dev->reg.encr_cfg_aes_ctr_128;
+		else
+			encr_cfg = pce_dev->reg.encr_cfg_aes_ctr_256;
+		break;
+	}
+	pce_dev->mode = creq->mode;
 
-    switch (creq->alg) {
-    case CIPHER_ALG_DES:
-        if (creq->mode !=  QCE_MODE_ECB) {
-            encr_cfg = pce_dev->reg.encr_cfg_des_cbc;
-            _byte_stream_to_net_words(enciv32, creq->iv, ivsize);
-            writel_relaxed(enciv32[0], pce_dev->iobase +
-                           CRYPTO_CNTR0_IV0_REG);
-            writel_relaxed(enciv32[1], pce_dev->iobase +
-                           CRYPTO_CNTR1_IV1_REG);
-        } else {
-            encr_cfg = pce_dev->reg.encr_cfg_des_ecb;
-        }
-        if (use_hw_key == false) {
-            writel_relaxed(enckey32[0], pce_dev->iobase +
-                           CRYPTO_ENCR_KEY0_REG);
-            writel_relaxed(enckey32[1], pce_dev->iobase +
-                           CRYPTO_ENCR_KEY1_REG);
-        }
-        break;
-    case CIPHER_ALG_3DES:
-        if (creq->mode !=  QCE_MODE_ECB) {
-            _byte_stream_to_net_words(enciv32, creq->iv, ivsize);
-            writel_relaxed(enciv32[0], pce_dev->iobase +
-                           CRYPTO_CNTR0_IV0_REG);
-            writel_relaxed(enciv32[1], pce_dev->iobase +
-                           CRYPTO_CNTR1_IV1_REG);
-            encr_cfg = pce_dev->reg.encr_cfg_3des_cbc;
-        } else {
-            encr_cfg = pce_dev->reg.encr_cfg_3des_ecb;
-        }
-        if (use_hw_key == false) {
-            /* write encr key */
-            for (i = 0; i < 6; i++)
-                writel_relaxed(enckey32[0], (pce_dev->iobase +
-                                             (CRYPTO_ENCR_KEY0_REG + i * sizeof(uint32_t))));
-        }
-        break;
-    case CIPHER_ALG_AES:
-    default:
-        if (creq->mode ==  QCE_MODE_XTS) {
-            uint32_t xtskey32[MAX_CIPHER_KEY_SIZE/sizeof(uint32_t)]
-                = {0, 0, 0, 0, 0, 0, 0, 0};
-            uint32_t xtsklen =
-                creq->encklen/(2 * sizeof(uint32_t));
+	switch (creq->alg) {
+	case CIPHER_ALG_DES:
+		if (creq->mode !=  QCE_MODE_ECB) {
+			encr_cfg = pce_dev->reg.encr_cfg_des_cbc;
+			_byte_stream_to_net_words(enciv32, creq->iv, ivsize);
+			writel_relaxed(enciv32[0], pce_dev->iobase +
+						CRYPTO_CNTR0_IV0_REG);
+			writel_relaxed(enciv32[1], pce_dev->iobase +
+						CRYPTO_CNTR1_IV1_REG);
+		} else {
+			encr_cfg = pce_dev->reg.encr_cfg_des_ecb;
+		}
+		if (use_hw_key == false) {
+			writel_relaxed(enckey32[0], pce_dev->iobase +
+							CRYPTO_ENCR_KEY0_REG);
+			writel_relaxed(enckey32[1], pce_dev->iobase +
+							CRYPTO_ENCR_KEY1_REG);
+		}
+		break;
+	case CIPHER_ALG_3DES:
+		if (creq->mode !=  QCE_MODE_ECB) {
+			_byte_stream_to_net_words(enciv32, creq->iv, ivsize);
+			writel_relaxed(enciv32[0], pce_dev->iobase +
+						CRYPTO_CNTR0_IV0_REG);
+			writel_relaxed(enciv32[1], pce_dev->iobase +
+						CRYPTO_CNTR1_IV1_REG);
+			encr_cfg = pce_dev->reg.encr_cfg_3des_cbc;
+		} else {
+			encr_cfg = pce_dev->reg.encr_cfg_3des_ecb;
+		}
+		if (use_hw_key == false) {
+			/* write encr key */
+			for (i = 0; i < 6; i++)
+				writel_relaxed(enckey32[0], (pce_dev->iobase +
+				(CRYPTO_ENCR_KEY0_REG + i * sizeof(uint32_t))));
+		}
+		break;
+	case CIPHER_ALG_AES:
+	default:
+		if (creq->mode ==  QCE_MODE_XTS) {
+			uint32_t xtskey32[MAX_CIPHER_KEY_SIZE/sizeof(uint32_t)]
+					= {0, 0, 0, 0, 0, 0, 0, 0};
+			uint32_t xtsklen =
+					creq->encklen/(2 * sizeof(uint32_t));
 
-            if ((use_hw_key == false) && (use_pipe_key == false)) {
-                _byte_stream_to_net_words(xtskey32,
-                                          (creq->enckey + creq->encklen/2),
-                                          creq->encklen/2);
-                /* write xts encr key */
-                for (i = 0; i < xtsklen; i++)
-                    writel_relaxed(xtskey32[i],
-                                   pce_dev->iobase +
-                                   CRYPTO_ENCR_XTS_KEY0_REG +
-                                   (i * sizeof(uint32_t)));
-            }
-            /* write xts du size */
-            switch (creq->flags & QCRYPTO_CTX_XTS_MASK) {
-            case QCRYPTO_CTX_XTS_DU_SIZE_512B:
-                writel_relaxed(
-                    min((uint32_t)QCE_SECTOR_SIZE,
-                        creq->cryptlen), pce_dev->iobase +
-                    CRYPTO_ENCR_XTS_DU_SIZE_REG);
-                break;
-            case QCRYPTO_CTX_XTS_DU_SIZE_1KB:
-                writel_relaxed(
-                    min((uint32_t)(QCE_SECTOR_SIZE * 2),
-                        creq->cryptlen), pce_dev->iobase +
-                    CRYPTO_ENCR_XTS_DU_SIZE_REG);
-                break;
-            default:
-                writel_relaxed(creq->cryptlen,
-                               pce_dev->iobase +
-                               CRYPTO_ENCR_XTS_DU_SIZE_REG);
-                break;
-            }
-        }
-        if (creq->mode !=  QCE_MODE_ECB) {
-            if (creq->mode ==  QCE_MODE_XTS)
-                _byte_stream_swap_to_net_words(enciv32,
-                                               creq->iv, ivsize);
-            else
-                _byte_stream_to_net_words(enciv32, creq->iv,
-                                          ivsize);
+			if ((use_hw_key == false) && (use_pipe_key == false)) {
+				_byte_stream_to_net_words(xtskey32,
+					(creq->enckey + creq->encklen/2),
+							creq->encklen/2);
+				/* write xts encr key */
+				for (i = 0; i < xtsklen; i++)
+					writel_relaxed(xtskey32[i],
+						pce_dev->iobase +
+						CRYPTO_ENCR_XTS_KEY0_REG +
+						(i * sizeof(uint32_t)));
+			}
+			/* write xts du size */
+			switch (creq->flags & QCRYPTO_CTX_XTS_MASK) {
+			case QCRYPTO_CTX_XTS_DU_SIZE_512B:
+				writel_relaxed(
+					min((uint32_t)QCE_SECTOR_SIZE,
+					creq->cryptlen), pce_dev->iobase +
+					CRYPTO_ENCR_XTS_DU_SIZE_REG);
+				break;
+			case QCRYPTO_CTX_XTS_DU_SIZE_1KB:
+				writel_relaxed(
+					min((uint32_t)(QCE_SECTOR_SIZE * 2),
+					creq->cryptlen), pce_dev->iobase +
+					CRYPTO_ENCR_XTS_DU_SIZE_REG);
+				break;
+			default:
+				writel_relaxed(creq->cryptlen,
+					pce_dev->iobase +
+					CRYPTO_ENCR_XTS_DU_SIZE_REG);
+				break;
+			}
+		}
+		if (creq->mode !=  QCE_MODE_ECB) {
+			if (creq->mode ==  QCE_MODE_XTS)
+				_byte_stream_swap_to_net_words(enciv32,
+							creq->iv, ivsize);
+			else
+				_byte_stream_to_net_words(enciv32, creq->iv,
+								ivsize);
 
-            /* write encr cntr iv */
-            for (i = 0; i <= 3; i++)
-                writel_relaxed(enciv32[i], pce_dev->iobase +
-                               CRYPTO_CNTR0_IV0_REG +
-                               (i * sizeof(uint32_t)));
+			/* write encr cntr iv */
+			for (i = 0; i <= 3; i++)
+				writel_relaxed(enciv32[i], pce_dev->iobase +
+							CRYPTO_CNTR0_IV0_REG +
+							(i * sizeof(uint32_t)));
 
-            if (creq->mode == QCE_MODE_CCM) {
-                /* write cntr iv for ccm */
-                for (i = 0; i <= 3; i++)
-                    writel_relaxed(enciv32[i],
-                                   pce_dev->iobase +
-                                   CRYPTO_ENCR_CCM_INT_CNTR0_REG +
-                                   (i * sizeof(uint32_t)));
-                /* update cntr_iv[3] by one */
-                writel_relaxed((enciv32[3] + 1),
-                               pce_dev->iobase +
-                               CRYPTO_CNTR0_IV0_REG +
-                               (3 * sizeof(uint32_t)));
-            }
-        }
+			if (creq->mode == QCE_MODE_CCM) {
+				/* write cntr iv for ccm */
+				for (i = 0; i <= 3; i++)
+					writel_relaxed(enciv32[i],
+						pce_dev->iobase +
+						CRYPTO_ENCR_CCM_INT_CNTR0_REG +
+							(i * sizeof(uint32_t)));
+				/* update cntr_iv[3] by one */
+				writel_relaxed((enciv32[3] + 1),
+							pce_dev->iobase +
+							CRYPTO_CNTR0_IV0_REG +
+							(3 * sizeof(uint32_t)));
+			}
+		}
 
-        if (creq->op == QCE_REQ_ABLK_CIPHER_NO_KEY) {
-            encr_cfg |= (CRYPTO_ENCR_KEY_SZ_AES128 <<
-                         CRYPTO_ENCR_KEY_SZ);
-        } else {
-            if ((use_hw_key == false) && (use_pipe_key == false)) {
-                for (i = 0; i < enck_size_in_word; i++)
-                    writel_relaxed(enckey32[i],
-                                   pce_dev->iobase +
-                                   CRYPTO_ENCR_KEY0_REG +
-                                   (i * sizeof(uint32_t)));
-            }
-        } /* else of if (creq->op == QCE_REQ_ABLK_CIPHER_NO_KEY) */
-        break;
-    } /* end of switch (creq->mode)  */
+		if (creq->op == QCE_REQ_ABLK_CIPHER_NO_KEY) {
+				encr_cfg |= (CRYPTO_ENCR_KEY_SZ_AES128 <<
+						CRYPTO_ENCR_KEY_SZ);
+		} else {
+			if ((use_hw_key == false) && (use_pipe_key == false)) {
+				for (i = 0; i < enck_size_in_word; i++)
+					writel_relaxed(enckey32[i],
+						pce_dev->iobase +
+							CRYPTO_ENCR_KEY0_REG +
+							(i * sizeof(uint32_t)));
+			}
+		} /* else of if (creq->op == QCE_REQ_ABLK_CIPHER_NO_KEY) */
+		break;
+	} /* end of switch (creq->mode)  */
 
-    if (use_pipe_key)
-        encr_cfg |= (CRYPTO_USE_PIPE_KEY_ENCR_ENABLED
-                     << CRYPTO_USE_PIPE_KEY_ENCR);
+	if (use_pipe_key)
+		encr_cfg |= (CRYPTO_USE_PIPE_KEY_ENCR_ENABLED
+					<< CRYPTO_USE_PIPE_KEY_ENCR);
 
-    /* write encr seg cfg */
-    encr_cfg |= ((creq->dir == QCE_ENCRYPT) ? 1 : 0) << CRYPTO_ENCODE;
-    if (use_hw_key == true)
-        encr_cfg |= (CRYPTO_USE_HW_KEY << CRYPTO_USE_HW_KEY_ENCR);
-    else
-        encr_cfg &= ~(CRYPTO_USE_HW_KEY << CRYPTO_USE_HW_KEY_ENCR);
-    /* write encr seg cfg */
-    writel_relaxed(encr_cfg, pce_dev->iobase + CRYPTO_ENCR_SEG_CFG_REG);
+	/* write encr seg cfg */
+	encr_cfg |= ((creq->dir == QCE_ENCRYPT) ? 1 : 0) << CRYPTO_ENCODE;
+	if (use_hw_key == true)
+		encr_cfg |= (CRYPTO_USE_HW_KEY << CRYPTO_USE_HW_KEY_ENCR);
+	else
+		encr_cfg &= ~(CRYPTO_USE_HW_KEY << CRYPTO_USE_HW_KEY_ENCR);
+	/* write encr seg cfg */
+	writel_relaxed(encr_cfg, pce_dev->iobase + CRYPTO_ENCR_SEG_CFG_REG);
 
-    /* write encr seg size */
-    if ((creq->mode == QCE_MODE_CCM) && (creq->dir == QCE_DECRYPT))
-        writel_relaxed((creq->cryptlen + creq->authsize),
-                       pce_dev->iobase + CRYPTO_ENCR_SEG_SIZE_REG);
-    else
-        writel_relaxed(creq->cryptlen,
-                       pce_dev->iobase + CRYPTO_ENCR_SEG_SIZE_REG);
+	/* write encr seg size */
+	if ((creq->mode == QCE_MODE_CCM) && (creq->dir == QCE_DECRYPT))
+		writel_relaxed((creq->cryptlen + creq->authsize),
+				pce_dev->iobase + CRYPTO_ENCR_SEG_SIZE_REG);
+	else
+		writel_relaxed(creq->cryptlen,
+				pce_dev->iobase + CRYPTO_ENCR_SEG_SIZE_REG);
 
-    /* write encr seg start */
-    writel_relaxed((coffset & 0xffff),
-                   pce_dev->iobase + CRYPTO_ENCR_SEG_START_REG);
-    /* write encr seg start */
-    writel_relaxed(0xffffffff,
-                   pce_dev->iobase + CRYPTO_CNTR_MASK_REG);
+	/* write encr seg start */
+	writel_relaxed((coffset & 0xffff),
+			pce_dev->iobase + CRYPTO_ENCR_SEG_START_REG);
+	/* write encr seg start */
+	writel_relaxed(0xffffffff,
+			pce_dev->iobase + CRYPTO_CNTR_MASK_REG);
 
-    /* write seg size  */
-    writel_relaxed(totallen_in, pce_dev->iobase + CRYPTO_SEG_SIZE_REG);
+	/* write seg size  */
+	writel_relaxed(totallen_in, pce_dev->iobase + CRYPTO_SEG_SIZE_REG);
 
-    writel_relaxed(pce_dev->reg.crypto_cfg_le, (pce_dev->iobase +
-                   CRYPTO_CONFIG_REG));
-    /* issue go to crypto   */
-    if (use_hw_key == false)
-        writel_relaxed(((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP)),
-                       pce_dev->iobase + CRYPTO_GOPROC_REG);
-    else
-        writel_relaxed(((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP)),
-                       pce_dev->iobase + CRYPTO_GOPROC_QC_KEY_REG);
-    /*
-     * Ensure previous instructions (setting the GO register)
-     * was completed before issuing a DMA transfer request
-     */
-    mb();
-    return 0;
+	writel_relaxed(pce_dev->reg.crypto_cfg_le, (pce_dev->iobase +
+							CRYPTO_CONFIG_REG));
+	/* issue go to crypto   */
+	if (use_hw_key == false)
+		writel_relaxed(((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP) |
+				(1 << CRYPTO_CLR_CNTXT)),
+				pce_dev->iobase + CRYPTO_GOPROC_REG);
+	else
+		writel_relaxed(((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP)),
+				pce_dev->iobase + CRYPTO_GOPROC_QC_KEY_REG);
+	/*
+	 * Ensure previous instructions (setting the GO register)
+	 * was completed before issuing a DMA transfer request
+	 */
+	mb();
+	return 0;
 };
 
 static int _ce_f9_setup_direct(struct qce_device *pce_dev,
                                struct qce_f9_req *req)
 {
-    uint32_t ikey32[OTA_KEY_SIZE/sizeof(uint32_t)];
-    uint32_t key_size_in_word = OTA_KEY_SIZE/sizeof(uint32_t);
-    uint32_t auth_cfg;
-    int i;
+	uint32_t ikey32[OTA_KEY_SIZE/sizeof(uint32_t)];
+	uint32_t key_size_in_word = OTA_KEY_SIZE/sizeof(uint32_t);
+	uint32_t auth_cfg;
+	int i;
 
-    switch (req->algorithm) {
-    case QCE_OTA_ALGO_KASUMI:
-        auth_cfg = pce_dev->reg.auth_cfg_kasumi;
-        break;
-    case QCE_OTA_ALGO_SNOW3G:
-    default:
-        auth_cfg = pce_dev->reg.auth_cfg_snow3g;
-        break;
-    };
+	switch (req->algorithm) {
+	case QCE_OTA_ALGO_KASUMI:
+		auth_cfg = pce_dev->reg.auth_cfg_kasumi;
+		break;
+	case QCE_OTA_ALGO_SNOW3G:
+	default:
+		auth_cfg = pce_dev->reg.auth_cfg_snow3g;
+		break;
+	};
 
-    /* clear status */
-    writel_relaxed(0, pce_dev->iobase + CRYPTO_STATUS_REG);
+	/* clear status */
+	writel_relaxed(0, pce_dev->iobase + CRYPTO_STATUS_REG);
 
-    /* set big endian configuration */
-    writel_relaxed(pce_dev->reg.crypto_cfg_be, (pce_dev->iobase +
-                   CRYPTO_CONFIG_REG));
-    /*
-     * Ensure previous instructions (setting the CONFIG register)
-     * was completed before issuing starting to set other config register
-     * This is to ensure the configurations are done in correct endian-ness
-     * as set in the CONFIG registers
-     */
-    mb();
+	/* set big endian configuration */
+	writel_relaxed(pce_dev->reg.crypto_cfg_be, (pce_dev->iobase +
+							CRYPTO_CONFIG_REG));
+	/*
+	 * Ensure previous instructions (setting the CONFIG register)
+	 * was completed before issuing starting to set other config register
+	 * This is to ensure the configurations are done in correct endian-ness
+	 * as set in the CONFIG registers
+	 */
+	mb();
 
-    /* write enc_seg_cfg */
-    writel_relaxed(0, pce_dev->iobase + CRYPTO_ENCR_SEG_CFG_REG);
+	/* write enc_seg_cfg */
+	writel_relaxed(0, pce_dev->iobase + CRYPTO_ENCR_SEG_CFG_REG);
 
-    /* write ecn_seg_size */
-    writel_relaxed(0, pce_dev->iobase + CRYPTO_ENCR_SEG_SIZE_REG);
+	/* write ecn_seg_size */
+	writel_relaxed(0, pce_dev->iobase + CRYPTO_ENCR_SEG_SIZE_REG);
 
-    /* write key in CRYPTO_AUTH_IV0-3_REG */
-    _byte_stream_to_net_words(ikey32, &req->ikey[0], OTA_KEY_SIZE);
-    for (i = 0; i < key_size_in_word; i++)
-        writel_relaxed(ikey32[i], (pce_dev->iobase +
-                                   (CRYPTO_AUTH_IV0_REG + i*sizeof(uint32_t))));
+	/* write key in CRYPTO_AUTH_IV0-3_REG */
+	_byte_stream_to_net_words(ikey32, &req->ikey[0], OTA_KEY_SIZE);
+	for (i = 0; i < key_size_in_word; i++)
+		writel_relaxed(ikey32[i], (pce_dev->iobase +
+			(CRYPTO_AUTH_IV0_REG + i*sizeof(uint32_t))));
 
-    /* write last bits  in CRYPTO_AUTH_IV4_REG  */
-    writel_relaxed(req->last_bits, (pce_dev->iobase +
-                                    CRYPTO_AUTH_IV4_REG));
+	/* write last bits  in CRYPTO_AUTH_IV4_REG  */
+	writel_relaxed(req->last_bits, (pce_dev->iobase +
+					CRYPTO_AUTH_IV4_REG));
 
-    /* write fresh to CRYPTO_AUTH_BYTECNT0_REG */
-    writel_relaxed(req->fresh, (pce_dev->iobase +
-                                CRYPTO_AUTH_BYTECNT0_REG));
+	/* write fresh to CRYPTO_AUTH_BYTECNT0_REG */
+	writel_relaxed(req->fresh, (pce_dev->iobase +
+					 CRYPTO_AUTH_BYTECNT0_REG));
 
-    /* write count-i  to CRYPTO_AUTH_BYTECNT1_REG */
-    writel_relaxed(req->count_i, (pce_dev->iobase +
-                                  CRYPTO_AUTH_BYTECNT1_REG));
+	/* write count-i  to CRYPTO_AUTH_BYTECNT1_REG */
+	writel_relaxed(req->count_i, (pce_dev->iobase +
+					 CRYPTO_AUTH_BYTECNT1_REG));
 
-    /* write auth seg cfg */
-    if (req->direction == QCE_OTA_DIR_DOWNLINK)
-        auth_cfg |= BIT(CRYPTO_F9_DIRECTION);
-    writel_relaxed(auth_cfg, pce_dev->iobase + CRYPTO_AUTH_SEG_CFG_REG);
+	/* write auth seg cfg */
+	if (req->direction == QCE_OTA_DIR_DOWNLINK)
+		auth_cfg |= BIT(CRYPTO_F9_DIRECTION);
+	writel_relaxed(auth_cfg, pce_dev->iobase + CRYPTO_AUTH_SEG_CFG_REG);
 
-    /* write auth seg size */
-    writel_relaxed(req->msize, pce_dev->iobase + CRYPTO_AUTH_SEG_SIZE_REG);
+	/* write auth seg size */
+	writel_relaxed(req->msize, pce_dev->iobase + CRYPTO_AUTH_SEG_SIZE_REG);
 
-    /* write auth seg start*/
-    writel_relaxed(0, pce_dev->iobase + CRYPTO_AUTH_SEG_START_REG);
+	/* write auth seg start*/
+	writel_relaxed(0, pce_dev->iobase + CRYPTO_AUTH_SEG_START_REG);
 
-    /* write seg size  */
-    writel_relaxed(req->msize, pce_dev->iobase + CRYPTO_SEG_SIZE_REG);
+	/* write seg size  */
+	writel_relaxed(req->msize, pce_dev->iobase + CRYPTO_SEG_SIZE_REG);
 
-    /* set little endian configuration before go*/
-    writel_relaxed(pce_dev->reg.crypto_cfg_le, (pce_dev->iobase +
-                   CRYPTO_CONFIG_REG));
-    /* write go */
-    writel_relaxed(((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP)),
-                   pce_dev->iobase +  CRYPTO_GOPROC_REG);
-    /*
-     * Ensure previous instructions (setting the GO register)
-     * was completed before issuing a DMA transfer request
-     */
-    mb();
-    return 0;
+	/* set little endian configuration before go*/
+	writel_relaxed(pce_dev->reg.crypto_cfg_le, (pce_dev->iobase +
+							CRYPTO_CONFIG_REG));
+	/* write go */
+	writel_relaxed(((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP) |
+		(1 << CRYPTO_CLR_CNTXT)), pce_dev->iobase +  CRYPTO_GOPROC_REG);
+	/*
+	 * Ensure previous instructions (setting the GO register)
+	 * was completed before issuing a DMA transfer request
+	 */
+	mb();
+	return 0;
 }
 
 static int _ce_f8_setup_direct(struct qce_device *pce_dev,
                                struct qce_f8_req *req, bool key_stream_mode,
                                uint16_t npkts, uint16_t cipher_offset, uint16_t cipher_size)
 {
-    int i = 0;
-    uint32_t encr_cfg = 0;
-    uint32_t ckey32[OTA_KEY_SIZE/sizeof(uint32_t)];
-    uint32_t key_size_in_word = OTA_KEY_SIZE/sizeof(uint32_t);
+	int i = 0;
+	uint32_t encr_cfg = 0;
+	uint32_t ckey32[OTA_KEY_SIZE/sizeof(uint32_t)];
+	uint32_t key_size_in_word = OTA_KEY_SIZE/sizeof(uint32_t);
 
-    switch (req->algorithm) {
-    case QCE_OTA_ALGO_KASUMI:
-        encr_cfg = pce_dev->reg.encr_cfg_kasumi;
-        break;
-    case QCE_OTA_ALGO_SNOW3G:
-    default:
-        encr_cfg = pce_dev->reg.encr_cfg_snow3g;
-        break;
-    };
-    /* clear status */
-    writel_relaxed(0, pce_dev->iobase + CRYPTO_STATUS_REG);
-    /* set big endian configuration */
-    writel_relaxed(pce_dev->reg.crypto_cfg_be, (pce_dev->iobase +
-                   CRYPTO_CONFIG_REG));
-    /* write auth seg configuration */
-    writel_relaxed(0, pce_dev->iobase + CRYPTO_AUTH_SEG_CFG_REG);
-    /* write auth seg size */
-    writel_relaxed(0, pce_dev->iobase + CRYPTO_AUTH_SEG_SIZE_REG);
+	switch (req->algorithm) {
+	case QCE_OTA_ALGO_KASUMI:
+		encr_cfg = pce_dev->reg.encr_cfg_kasumi;
+		break;
+	case QCE_OTA_ALGO_SNOW3G:
+	default:
+		encr_cfg = pce_dev->reg.encr_cfg_snow3g;
+		break;
+	};
+	/* clear status */
+	writel_relaxed(0, pce_dev->iobase + CRYPTO_STATUS_REG);
+	/* set big endian configuration */
+	writel_relaxed(pce_dev->reg.crypto_cfg_be, (pce_dev->iobase +
+							CRYPTO_CONFIG_REG));
+	/* write auth seg configuration */
+	writel_relaxed(0, pce_dev->iobase + CRYPTO_AUTH_SEG_CFG_REG);
+	/* write auth seg size */
+	writel_relaxed(0, pce_dev->iobase + CRYPTO_AUTH_SEG_SIZE_REG);
 
-    /* write key */
-    _byte_stream_to_net_words(ckey32, &req->ckey[0], OTA_KEY_SIZE);
+	/* write key */
+	_byte_stream_to_net_words(ckey32, &req->ckey[0], OTA_KEY_SIZE);
 
-    for (i = 0; i < key_size_in_word; i++)
-        writel_relaxed(ckey32[i], (pce_dev->iobase +
-                                   (CRYPTO_ENCR_KEY0_REG + i*sizeof(uint32_t))));
-    /* write encr seg cfg */
-    if (key_stream_mode)
-        encr_cfg |= BIT(CRYPTO_F8_KEYSTREAM_ENABLE);
-    if (req->direction == QCE_OTA_DIR_DOWNLINK)
-        encr_cfg |= BIT(CRYPTO_F8_DIRECTION);
-    writel_relaxed(encr_cfg, pce_dev->iobase +
-                   CRYPTO_ENCR_SEG_CFG_REG);
+	for (i = 0; i < key_size_in_word; i++)
+		writel_relaxed(ckey32[i], (pce_dev->iobase +
+			(CRYPTO_ENCR_KEY0_REG + i*sizeof(uint32_t))));
+	/* write encr seg cfg */
+	if (key_stream_mode)
+		encr_cfg |= BIT(CRYPTO_F8_KEYSTREAM_ENABLE);
+	if (req->direction == QCE_OTA_DIR_DOWNLINK)
+		encr_cfg |= BIT(CRYPTO_F8_DIRECTION);
+	writel_relaxed(encr_cfg, pce_dev->iobase +
+		CRYPTO_ENCR_SEG_CFG_REG);
 
-    /* write encr seg start */
-    writel_relaxed((cipher_offset & 0xffff), pce_dev->iobase +
-                   CRYPTO_ENCR_SEG_START_REG);
-    /* write encr seg size  */
-    writel_relaxed(cipher_size, pce_dev->iobase +
-                   CRYPTO_ENCR_SEG_SIZE_REG);
+	/* write encr seg start */
+	writel_relaxed((cipher_offset & 0xffff), pce_dev->iobase +
+		CRYPTO_ENCR_SEG_START_REG);
+	/* write encr seg size  */
+	writel_relaxed(cipher_size, pce_dev->iobase +
+		CRYPTO_ENCR_SEG_SIZE_REG);
 
-    /* write seg size  */
-    writel_relaxed(req->data_len, pce_dev->iobase +
-                   CRYPTO_SEG_SIZE_REG);
+	/* write seg size  */
+	writel_relaxed(req->data_len, pce_dev->iobase +
+		CRYPTO_SEG_SIZE_REG);
 
-    /* write cntr0_iv0 for countC */
-    writel_relaxed(req->count_c, pce_dev->iobase +
-                   CRYPTO_CNTR0_IV0_REG);
-    /* write cntr1_iv1 for nPkts, and bearer */
-    if (npkts == 1)
-        npkts = 0;
-    writel_relaxed(req->bearer << CRYPTO_CNTR1_IV1_REG_F8_BEARER |
-                   npkts << CRYPTO_CNTR1_IV1_REG_F8_PKT_CNT,
-                   pce_dev->iobase + CRYPTO_CNTR1_IV1_REG);
+	/* write cntr0_iv0 for countC */
+	writel_relaxed(req->count_c, pce_dev->iobase +
+		CRYPTO_CNTR0_IV0_REG);
+	/* write cntr1_iv1 for nPkts, and bearer */
+	if (npkts == 1)
+		npkts = 0;
+	writel_relaxed(req->bearer << CRYPTO_CNTR1_IV1_REG_F8_BEARER |
+				npkts << CRYPTO_CNTR1_IV1_REG_F8_PKT_CNT,
+			pce_dev->iobase + CRYPTO_CNTR1_IV1_REG);
 
-    /* set little endian configuration before go*/
-    writel_relaxed(pce_dev->reg.crypto_cfg_le, (pce_dev->iobase +
-                   CRYPTO_CONFIG_REG));
-    /* write go */
-    writel_relaxed(((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP)),
-                   pce_dev->iobase +  CRYPTO_GOPROC_REG);
-    /*
-     * Ensure previous instructions (setting the GO register)
-     * was completed before issuing a DMA transfer request
-     */
-    mb();
-    return 0;
+	/* set little endian configuration before go*/
+	writel_relaxed(pce_dev->reg.crypto_cfg_le, (pce_dev->iobase +
+							CRYPTO_CONFIG_REG));
+	/* write go */
+	writel_relaxed(((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP) |
+		(1 << CRYPTO_CLR_CNTXT)), pce_dev->iobase +  CRYPTO_GOPROC_REG);
+	/*
+	 * Ensure previous instructions (setting the GO register)
+	 * was completed before issuing a DMA transfer request
+	 */
+	mb();
+	return 0;
 }
 
 
@@ -2968,457 +2970,456 @@ static int _setup_cipher_aes_cmdlistptrs(struct qce_device *pdev,
         unsigned char **pvaddr, enum qce_cipher_mode_enum mode,
         bool key_128)
 {
-    struct sps_command_element *ce_vaddr;
-    uint32_t ce_vaddr_start;
-    struct qce_cmdlistptr_ops *cmdlistptr = &pdev->ce_sps.cmdlistptr;
-    struct qce_cmdlist_info *pcl_info = NULL;
-    int i = 0;
-    uint32_t encr_cfg = 0;
-    uint32_t key_reg = 0;
-    uint32_t xts_key_reg = 0;
-    uint32_t iv_reg = 0;
+	struct sps_command_element *ce_vaddr;
+	uint32_t ce_vaddr_start;
+	struct qce_cmdlistptr_ops *cmdlistptr = &pdev->ce_sps.cmdlistptr;
+	struct qce_cmdlist_info *pcl_info = NULL;
+	int i = 0;
+	uint32_t encr_cfg = 0;
+	uint32_t key_reg = 0;
+	uint32_t xts_key_reg = 0;
+	uint32_t iv_reg = 0;
 
-    *pvaddr = (unsigned char *) ALIGN(((unsigned int)(*pvaddr)),
-                                      pdev->ce_sps.ce_burst_size);
-    ce_vaddr = (struct sps_command_element *)(*pvaddr);
-    ce_vaddr_start = (uint32_t)(*pvaddr);
-    /*
-     * Designate chunks of the allocated memory to various
-     * command list pointers related to AES cipher operations defined
-     * in ce_cmdlistptrs_ops structure.
-     */
-    switch (mode) {
-    case QCE_MODE_CBC:
-    case QCE_MODE_CTR:
-        if (key_128 == true) {
-            cmdlistptr->cipher_aes_128_cbc_ctr.cmdlist =
-                (uint32_t)ce_vaddr;
-            pcl_info = &(cmdlistptr->cipher_aes_128_cbc_ctr);
-            if (mode == QCE_MODE_CBC)
-                encr_cfg = pdev->reg.encr_cfg_aes_cbc_128;
-            else
-                encr_cfg = pdev->reg.encr_cfg_aes_ctr_128;
-            iv_reg = 4;
-            key_reg = 4;
-            xts_key_reg = 0;
-        } else {
-            cmdlistptr->cipher_aes_256_cbc_ctr.cmdlist =
-                (uint32_t)ce_vaddr;
-            pcl_info = &(cmdlistptr->cipher_aes_256_cbc_ctr);
+	*pvaddr = (unsigned char *) ALIGN(((unsigned int)(*pvaddr)),
+					pdev->ce_sps.ce_burst_size);
+	ce_vaddr = (struct sps_command_element *)(*pvaddr);
+	ce_vaddr_start = (uint32_t)(*pvaddr);
+	/*
+	 * Designate chunks of the allocated memory to various
+	 * command list pointers related to AES cipher operations defined
+	 * in ce_cmdlistptrs_ops structure.
+	 */
+	switch (mode) {
+	case QCE_MODE_CBC:
+	case QCE_MODE_CTR:
+		if (key_128 == true) {
+			cmdlistptr->cipher_aes_128_cbc_ctr.cmdlist =
+							(uint32_t)ce_vaddr;
+			pcl_info = &(cmdlistptr->cipher_aes_128_cbc_ctr);
+			if (mode == QCE_MODE_CBC)
+				encr_cfg = pdev->reg.encr_cfg_aes_cbc_128;
+			else
+				encr_cfg = pdev->reg.encr_cfg_aes_ctr_128;
+			iv_reg = 4;
+			key_reg = 4;
+			xts_key_reg = 0;
+		} else {
+			cmdlistptr->cipher_aes_256_cbc_ctr.cmdlist =
+							(uint32_t)ce_vaddr;
+			pcl_info = &(cmdlistptr->cipher_aes_256_cbc_ctr);
 
-            if (mode == QCE_MODE_CBC)
-                encr_cfg = pdev->reg.encr_cfg_aes_cbc_256;
-            else
-                encr_cfg = pdev->reg.encr_cfg_aes_ctr_256;
-            iv_reg = 4;
-            key_reg = 8;
-            xts_key_reg = 0;
-        }
-        break;
-    case QCE_MODE_ECB:
-        if (key_128 == true) {
-            cmdlistptr->cipher_aes_128_ecb.cmdlist =
-                (uint32_t)ce_vaddr;
-            pcl_info = &(cmdlistptr->cipher_aes_128_ecb);
+			if (mode == QCE_MODE_CBC)
+				encr_cfg = pdev->reg.encr_cfg_aes_cbc_256;
+			else
+				encr_cfg = pdev->reg.encr_cfg_aes_ctr_256;
+			iv_reg = 4;
+			key_reg = 8;
+			xts_key_reg = 0;
+		}
+	break;
+	case QCE_MODE_ECB:
+		if (key_128 == true) {
+			cmdlistptr->cipher_aes_128_ecb.cmdlist =
+							(uint32_t)ce_vaddr;
+			pcl_info = &(cmdlistptr->cipher_aes_128_ecb);
 
-            encr_cfg = pdev->reg.encr_cfg_aes_ecb_128;
-            iv_reg = 0;
-            key_reg = 4;
-            xts_key_reg = 0;
-        } else {
-            cmdlistptr->cipher_aes_256_ecb.cmdlist =
-                (uint32_t)ce_vaddr;
-            pcl_info = &(cmdlistptr->cipher_aes_256_ecb);
+			encr_cfg = pdev->reg.encr_cfg_aes_ecb_128;
+			iv_reg = 0;
+			key_reg = 4;
+			xts_key_reg = 0;
+		} else {
+			cmdlistptr->cipher_aes_256_ecb.cmdlist =
+							(uint32_t)ce_vaddr;
+			pcl_info = &(cmdlistptr->cipher_aes_256_ecb);
 
-            encr_cfg = pdev->reg.encr_cfg_aes_ecb_256;
-            iv_reg = 0;
-            key_reg = 8;
-            xts_key_reg = 0;
-        }
-        break;
-    case QCE_MODE_XTS:
-        if (key_128 == true) {
-            cmdlistptr->cipher_aes_128_xts.cmdlist =
-                (uint32_t)ce_vaddr;
-            pcl_info = &(cmdlistptr->cipher_aes_128_xts);
+			encr_cfg = pdev->reg.encr_cfg_aes_ecb_256;
+			iv_reg = 0;
+			key_reg = 8;
+			xts_key_reg = 0;
+		}
+	break;
+	case QCE_MODE_XTS:
+		if (key_128 == true) {
+			cmdlistptr->cipher_aes_128_xts.cmdlist =
+							(uint32_t)ce_vaddr;
+			pcl_info = &(cmdlistptr->cipher_aes_128_xts);
 
-            encr_cfg = pdev->reg.encr_cfg_aes_xts_128;
-            iv_reg = 4;
-            key_reg = 4;
-            xts_key_reg = 4;
-        } else {
-            cmdlistptr->cipher_aes_256_xts.cmdlist =
-                (uint32_t)ce_vaddr;
-            pcl_info = &(cmdlistptr->cipher_aes_256_xts);
+			encr_cfg = pdev->reg.encr_cfg_aes_xts_128;
+			iv_reg = 4;
+			key_reg = 4;
+			xts_key_reg = 4;
+		} else {
+			cmdlistptr->cipher_aes_256_xts.cmdlist =
+							(uint32_t)ce_vaddr;
+			pcl_info = &(cmdlistptr->cipher_aes_256_xts);
 
-            encr_cfg = pdev->reg.encr_cfg_aes_xts_256;
-            iv_reg = 4;
-            key_reg = 8;
-            xts_key_reg = 8;
-        }
-        break;
-    default:
-        pr_err("Unknown mode of operation %d received, exiting now\n",
-               mode);
-        return -EINVAL;
-        break;
-    }
+			encr_cfg = pdev->reg.encr_cfg_aes_xts_256;
+			iv_reg = 4;
+			key_reg = 8;
+			xts_key_reg = 8;
+		}
+	break;
+	default:
+		pr_err("Unknown mode of operation %d received, exiting now\n",
+			mode);
+		return -EINVAL;
+	break;
+	}
 
-    /* clear status register */
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG, 0, NULL);
+	/* clear status register */
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG, 0, NULL);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
-                        pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
+			pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_SEG_SIZE_REG, 0,
-                        &pcl_info->seg_size);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_CFG_REG, encr_cfg,
-                        &pcl_info->encr_seg_cfg);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_SIZE_REG, 0,
-                        &pcl_info->encr_seg_size);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_START_REG, 0,
-                        &pcl_info->encr_seg_start);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CNTR_MASK_REG,
-                        (uint32_t)0xffffffff, &pcl_info->encr_mask);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_CFG_REG, 0,
-                        &pcl_info->auth_seg_cfg);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_KEY0_REG, 0,
-                        &pcl_info->encr_key);
-    for (i = 1; i < key_reg; i++)
-        qce_add_cmd_element(pdev, &ce_vaddr,
-                            (CRYPTO_ENCR_KEY0_REG + i * sizeof(uint32_t)),
-                            0, NULL);
-    if (xts_key_reg) {
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_XTS_KEY0_REG,
-                            0, &pcl_info->encr_xts_key);
-        for (i = 1; i < xts_key_reg; i++)
-            qce_add_cmd_element(pdev, &ce_vaddr,
-                                (CRYPTO_ENCR_XTS_KEY0_REG +
-                                 i * sizeof(uint32_t)), 0, NULL);
-        qce_add_cmd_element(pdev, &ce_vaddr,
-                            CRYPTO_ENCR_XTS_DU_SIZE_REG, 0,
-                            &pcl_info->encr_xts_du_size);
-    }
-    if (iv_reg) {
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CNTR0_IV0_REG, 0,
-                            &pcl_info->encr_cntr_iv);
-        for (i = 1; i < iv_reg; i++)
-            qce_add_cmd_element(pdev, &ce_vaddr,
-                                (CRYPTO_CNTR0_IV0_REG + i * sizeof(uint32_t)),
-                                0, NULL);
-    }
-    /* Add dummy to  align size to burst-size multiple */
-    if (mode == QCE_MODE_XTS) {
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_SIZE_REG,
-                            0, &pcl_info->auth_seg_size);
-    } else {
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_SIZE_REG,
-                            0, &pcl_info->auth_seg_size);
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_START_REG,
-                            0, &pcl_info->auth_seg_size);
-    }
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
-                        pdev->reg.crypto_cfg_le, NULL);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_SEG_SIZE_REG, 0,
+						&pcl_info->seg_size);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_CFG_REG, encr_cfg,
+						&pcl_info->encr_seg_cfg);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_SIZE_REG, 0,
+						&pcl_info->encr_seg_size);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_START_REG, 0,
+						&pcl_info->encr_seg_start);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CNTR_MASK_REG,
+				(uint32_t)0xffffffff, &pcl_info->encr_mask);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_CFG_REG, 0,
+						&pcl_info->auth_seg_cfg);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_KEY0_REG, 0,
+						&pcl_info->encr_key);
+	for (i = 1; i < key_reg; i++)
+		qce_add_cmd_element(pdev, &ce_vaddr,
+				(CRYPTO_ENCR_KEY0_REG + i * sizeof(uint32_t)),
+				0, NULL);
+	if (xts_key_reg) {
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_XTS_KEY0_REG,
+					0, &pcl_info->encr_xts_key);
+		for (i = 1; i < xts_key_reg; i++)
+			qce_add_cmd_element(pdev, &ce_vaddr,
+				(CRYPTO_ENCR_XTS_KEY0_REG +
+						i * sizeof(uint32_t)), 0, NULL);
+		qce_add_cmd_element(pdev, &ce_vaddr,
+				CRYPTO_ENCR_XTS_DU_SIZE_REG, 0,
+					&pcl_info->encr_xts_du_size);
+	}
+	if (iv_reg) {
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CNTR0_IV0_REG, 0,
+						&pcl_info->encr_cntr_iv);
+		for (i = 1; i < iv_reg; i++)
+			qce_add_cmd_element(pdev, &ce_vaddr,
+				(CRYPTO_CNTR0_IV0_REG + i * sizeof(uint32_t)),
+				0, NULL);
+	}
+	/* Add dummy to  align size to burst-size multiple */
+	if (mode == QCE_MODE_XTS) {
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_SIZE_REG,
+						0, &pcl_info->auth_seg_size);
+	} else {
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_SIZE_REG,
+						0, &pcl_info->auth_seg_size);
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_START_REG,
+						0, &pcl_info->auth_seg_size);
+	}
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
+			pdev->reg.crypto_cfg_le, NULL);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_GOPROC_REG,
-                        ((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP)),
-                        &pcl_info->go_proc);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_GOPROC_REG,
+			((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP) |
+			(1 << CRYPTO_CLR_CNTXT)), &pcl_info->go_proc);
 
-    pcl_info->size = (uint32_t)ce_vaddr - (uint32_t)ce_vaddr_start;
-    *pvaddr = (unsigned char *) ce_vaddr;
+	pcl_info->size = (uint32_t)ce_vaddr - (uint32_t)ce_vaddr_start;
+	*pvaddr = (unsigned char *) ce_vaddr;
 
-    return 0;
+	return 0;
 }
 
 static int _setup_cipher_des_cmdlistptrs(struct qce_device *pdev,
         unsigned char **pvaddr, enum qce_cipher_alg_enum alg,
         bool mode_cbc)
 {
+	struct sps_command_element *ce_vaddr;
+	uint32_t ce_vaddr_start;
+	struct qce_cmdlistptr_ops *cmdlistptr = &pdev->ce_sps.cmdlistptr;
+	struct qce_cmdlist_info *pcl_info = NULL;
+	int i = 0;
+	uint32_t encr_cfg = 0;
+	uint32_t key_reg = 0;
+	uint32_t iv_reg = 0;
 
-    struct sps_command_element *ce_vaddr;
-    uint32_t ce_vaddr_start;
-    struct qce_cmdlistptr_ops *cmdlistptr = &pdev->ce_sps.cmdlistptr;
-    struct qce_cmdlist_info *pcl_info = NULL;
-    int i = 0;
-    uint32_t encr_cfg = 0;
-    uint32_t key_reg = 0;
-    uint32_t iv_reg = 0;
+	*pvaddr = (unsigned char *) ALIGN(((unsigned int)(*pvaddr)),
+					pdev->ce_sps.ce_burst_size);
+	ce_vaddr = (struct sps_command_element *)(*pvaddr);
+	ce_vaddr_start = (uint32_t)(*pvaddr);
 
-    *pvaddr = (unsigned char *) ALIGN(((unsigned int)(*pvaddr)),
-                                      pdev->ce_sps.ce_burst_size);
-    ce_vaddr = (struct sps_command_element *)(*pvaddr);
-    ce_vaddr_start = (uint32_t)(*pvaddr);
-
-    /*
-     * Designate chunks of the allocated memory to various
-     * command list pointers related to cipher operations defined
-     * in ce_cmdlistptrs_ops structure.
-     */
-    switch (alg) {
-    case CIPHER_ALG_DES:
-        if (mode_cbc) {
-            cmdlistptr->cipher_des_cbc.cmdlist =
-                (uint32_t)ce_vaddr;
-            pcl_info = &(cmdlistptr->cipher_des_cbc);
+	/*
+	 * Designate chunks of the allocated memory to various
+	 * command list pointers related to cipher operations defined
+	 * in ce_cmdlistptrs_ops structure.
+	 */
+	switch (alg) {
+	case CIPHER_ALG_DES:
+		if (mode_cbc) {
+			cmdlistptr->cipher_des_cbc.cmdlist =
+						(uint32_t)ce_vaddr;
+			pcl_info = &(cmdlistptr->cipher_des_cbc);
 
 
-            encr_cfg = pdev->reg.encr_cfg_des_cbc;
-            iv_reg = 2;
-            key_reg = 2;
-        } else {
-            cmdlistptr->cipher_des_ecb.cmdlist =
-                (uint32_t)ce_vaddr;
-            pcl_info = &(cmdlistptr->cipher_des_ecb);
+			encr_cfg = pdev->reg.encr_cfg_des_cbc;
+			iv_reg = 2;
+			key_reg = 2;
+		} else {
+			cmdlistptr->cipher_des_ecb.cmdlist =
+						(uint32_t)ce_vaddr;
+			pcl_info = &(cmdlistptr->cipher_des_ecb);
 
-            encr_cfg = pdev->reg.encr_cfg_des_ecb;
-            iv_reg = 0;
-            key_reg = 2;
-        }
-        break;
-    case CIPHER_ALG_3DES:
-        if (mode_cbc) {
-            cmdlistptr->cipher_3des_cbc.cmdlist =
-                (uint32_t)ce_vaddr;
-            pcl_info = &(cmdlistptr->cipher_3des_cbc);
+			encr_cfg = pdev->reg.encr_cfg_des_ecb;
+			iv_reg = 0;
+			key_reg = 2;
+		}
+	break;
+	case CIPHER_ALG_3DES:
+		if (mode_cbc) {
+			cmdlistptr->cipher_3des_cbc.cmdlist =
+						(uint32_t)ce_vaddr;
+			pcl_info = &(cmdlistptr->cipher_3des_cbc);
 
-            encr_cfg = pdev->reg.encr_cfg_3des_cbc;
-            iv_reg = 2;
-            key_reg = 6;
-        } else {
-            cmdlistptr->cipher_3des_ecb.cmdlist =
-                (uint32_t)ce_vaddr;
-            pcl_info = &(cmdlistptr->cipher_3des_ecb);
+			encr_cfg = pdev->reg.encr_cfg_3des_cbc;
+			iv_reg = 2;
+			key_reg = 6;
+		} else {
+			cmdlistptr->cipher_3des_ecb.cmdlist =
+						(uint32_t)ce_vaddr;
+			pcl_info = &(cmdlistptr->cipher_3des_ecb);
 
-            encr_cfg = pdev->reg.encr_cfg_3des_ecb;
-            iv_reg = 0;
-            key_reg = 6;
-        }
-        break;
-    default:
-        pr_err("Unknown algorithms %d received, exiting now\n", alg);
-        return -EINVAL;
-        break;
-    }
+			encr_cfg = pdev->reg.encr_cfg_3des_ecb;
+			iv_reg = 0;
+			key_reg = 6;
+		}
+	break;
+	default:
+		pr_err("Unknown algorithms %d received, exiting now\n", alg);
+		return -EINVAL;
+	break;
+	}
 
-    /* clear status register */
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG, 0, NULL);
+	/* clear status register */
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG, 0, NULL);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
-                        pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
+			pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_SEG_SIZE_REG, 0,
-                        &pcl_info->seg_size);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_CFG_REG, encr_cfg,
-                        &pcl_info->encr_seg_cfg);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_SIZE_REG, 0,
-                        &pcl_info->encr_seg_size);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_START_REG, 0,
-                        &pcl_info->encr_seg_start);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_CFG_REG, 0,
-                        &pcl_info->auth_seg_cfg);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_SEG_SIZE_REG, 0,
+						&pcl_info->seg_size);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_CFG_REG, encr_cfg,
+						&pcl_info->encr_seg_cfg);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_SIZE_REG, 0,
+						&pcl_info->encr_seg_size);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_START_REG, 0,
+						&pcl_info->encr_seg_start);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_CFG_REG, 0,
+						&pcl_info->auth_seg_cfg);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_KEY0_REG, 0,
-                        &pcl_info->encr_key);
-    for (i = 1; i < key_reg; i++)
-        qce_add_cmd_element(pdev, &ce_vaddr,
-                            (CRYPTO_ENCR_KEY0_REG + i * sizeof(uint32_t)),
-                            0, NULL);
-    if (iv_reg) {
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CNTR0_IV0_REG, 0,
-                            &pcl_info->encr_cntr_iv);
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CNTR1_IV1_REG, 0,
-                            NULL);
-    }
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_KEY0_REG, 0,
+						&pcl_info->encr_key);
+	for (i = 1; i < key_reg; i++)
+		qce_add_cmd_element(pdev, &ce_vaddr,
+				(CRYPTO_ENCR_KEY0_REG + i * sizeof(uint32_t)),
+				0, NULL);
+	if (iv_reg) {
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CNTR0_IV0_REG, 0,
+						&pcl_info->encr_cntr_iv);
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CNTR1_IV1_REG, 0,
+								NULL);
+	}
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
-                        pdev->reg.crypto_cfg_le, NULL);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
+			pdev->reg.crypto_cfg_le, NULL);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_GOPROC_REG,
-                        ((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP)),
-                        &pcl_info->go_proc);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_GOPROC_REG,
+			((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP) |
+			(1 << CRYPTO_CLR_CNTXT)), &pcl_info->go_proc);
 
-    pcl_info->size = (uint32_t)ce_vaddr - (uint32_t)ce_vaddr_start;
-    *pvaddr = (unsigned char *) ce_vaddr;
+	pcl_info->size = (uint32_t)ce_vaddr - (uint32_t)ce_vaddr_start;
+	*pvaddr = (unsigned char *) ce_vaddr;
 
-    return 0;
+	return 0;
 }
 
 static int _setup_auth_cmdlistptrs(struct qce_device *pdev,
                                    unsigned char **pvaddr, enum qce_hash_alg_enum alg,
                                    bool key_128)
 {
-    struct sps_command_element *ce_vaddr;
-    uint32_t ce_vaddr_start;
-    struct qce_cmdlistptr_ops *cmdlistptr = &pdev->ce_sps.cmdlistptr;
-    struct qce_cmdlist_info *pcl_info = NULL;
-    int i = 0;
-    uint32_t key_reg = 0;
-    uint32_t auth_cfg = 0;
-    uint32_t iv_reg = 0;
+	struct sps_command_element *ce_vaddr;
+	uint32_t ce_vaddr_start;
+	struct qce_cmdlistptr_ops *cmdlistptr = &pdev->ce_sps.cmdlistptr;
+	struct qce_cmdlist_info *pcl_info = NULL;
+	int i = 0;
+	uint32_t key_reg = 0;
+	uint32_t auth_cfg = 0;
+	uint32_t iv_reg = 0;
 
-    *pvaddr = (unsigned char *) ALIGN(((unsigned int)(*pvaddr)),
-                                      pdev->ce_sps.ce_burst_size);
-    ce_vaddr_start = (uint32_t)(*pvaddr);
-    ce_vaddr = (struct sps_command_element *)(*pvaddr);
+	*pvaddr = (unsigned char *) ALIGN(((unsigned int)(*pvaddr)),
+					pdev->ce_sps.ce_burst_size);
+	ce_vaddr_start = (uint32_t)(*pvaddr);
+	ce_vaddr = (struct sps_command_element *)(*pvaddr);
 
-    /*
-     * Designate chunks of the allocated memory to various
-     * command list pointers related to authentication operations
-     * defined in ce_cmdlistptrs_ops structure.
-     */
-    switch (alg) {
-    case QCE_HASH_SHA1:
-        cmdlistptr->auth_sha1.cmdlist = (uint32_t)ce_vaddr;
-        pcl_info = &(cmdlistptr->auth_sha1);
+	/*
+	 * Designate chunks of the allocated memory to various
+	 * command list pointers related to authentication operations
+	 * defined in ce_cmdlistptrs_ops structure.
+	 */
+	switch (alg) {
+	case QCE_HASH_SHA1:
+		cmdlistptr->auth_sha1.cmdlist = (uint32_t)ce_vaddr;
+		pcl_info = &(cmdlistptr->auth_sha1);
 
-        auth_cfg = pdev->reg.auth_cfg_sha1;
-        iv_reg = 5;
+		auth_cfg = pdev->reg.auth_cfg_sha1;
+		iv_reg = 5;
 
-        /* clear status register */
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG,
-                            0, NULL);
+		/* clear status register */
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG,
+					0, NULL);
 
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
-                            pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
+			pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
 
-        break;
-    case QCE_HASH_SHA256:
-        cmdlistptr->auth_sha256.cmdlist = (uint32_t)ce_vaddr;
-        pcl_info = &(cmdlistptr->auth_sha256);
+	break;
+	case QCE_HASH_SHA256:
+		cmdlistptr->auth_sha256.cmdlist = (uint32_t)ce_vaddr;
+		pcl_info = &(cmdlistptr->auth_sha256);
 
-        auth_cfg = pdev->reg.auth_cfg_sha256;
-        iv_reg = 8;
+		auth_cfg = pdev->reg.auth_cfg_sha256;
+		iv_reg = 8;
 
-        /* clear status register */
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG,
-                            0, NULL);
+		/* clear status register */
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG,
+					0, NULL);
 
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
-                            pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
-        /* 1 dummy write */
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_SIZE_REG,
-                            0, NULL);
-        break;
-    case QCE_HASH_SHA1_HMAC:
-        cmdlistptr->auth_sha1_hmac.cmdlist = (uint32_t)ce_vaddr;
-        pcl_info = &(cmdlistptr->auth_sha1_hmac);
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
+			pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
+		/* 1 dummy write */
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_SIZE_REG,
+								0, NULL);
+	break;
+	case QCE_HASH_SHA1_HMAC:
+		cmdlistptr->auth_sha1_hmac.cmdlist = (uint32_t)ce_vaddr;
+		pcl_info = &(cmdlistptr->auth_sha1_hmac);
 
-        auth_cfg = pdev->reg.auth_cfg_hmac_sha1;
-        key_reg = 16;
-        iv_reg = 5;
+		auth_cfg = pdev->reg.auth_cfg_hmac_sha1;
+		key_reg = 16;
+		iv_reg = 5;
 
-        /* clear status register */
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG,
-                            0, NULL);
+		/* clear status register */
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG,
+					0, NULL);
 
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
-                            pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
-        break;
-    case QCE_HASH_SHA256_HMAC:
-        cmdlistptr->auth_sha256_hmac.cmdlist = (uint32_t)ce_vaddr;
-        pcl_info = &(cmdlistptr->auth_sha256_hmac);
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
+			pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
+	break;
+	case QCE_HASH_SHA256_HMAC:
+		cmdlistptr->auth_sha256_hmac.cmdlist = (uint32_t)ce_vaddr;
+		pcl_info = &(cmdlistptr->auth_sha256_hmac);
 
-        auth_cfg = pdev->reg.auth_cfg_hmac_sha256;
-        key_reg = 16;
-        iv_reg = 8;
+		auth_cfg = pdev->reg.auth_cfg_hmac_sha256;
+		key_reg = 16;
+		iv_reg = 8;
 
-        /* clear status register */
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG, 0,
-                            NULL);
+		/* clear status register */
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG, 0,
+					NULL);
 
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
-                            pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
-        /* 1 dummy write */
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_SIZE_REG,
-                            0, NULL);
-        break;
-    case QCE_HASH_AES_CMAC:
-        if (key_128 == true) {
-            cmdlistptr->auth_aes_128_cmac.cmdlist =
-                (uint32_t)ce_vaddr;
-            pcl_info = &(cmdlistptr->auth_aes_128_cmac);
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
+			pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
+		/* 1 dummy write */
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_SIZE_REG,
+								0, NULL);
+	break;
+	case QCE_HASH_AES_CMAC:
+		if (key_128 == true) {
+			cmdlistptr->auth_aes_128_cmac.cmdlist =
+						(uint32_t)ce_vaddr;
+			pcl_info = &(cmdlistptr->auth_aes_128_cmac);
 
-            auth_cfg = pdev->reg.auth_cfg_cmac_128;
-            key_reg = 4;
-        } else {
-            cmdlistptr->auth_aes_256_cmac.cmdlist =
-                (uint32_t)ce_vaddr;
-            pcl_info = &(cmdlistptr->auth_aes_256_cmac);
+			auth_cfg = pdev->reg.auth_cfg_cmac_128;
+			key_reg = 4;
+		} else {
+			cmdlistptr->auth_aes_256_cmac.cmdlist =
+							(uint32_t)ce_vaddr;
+			pcl_info = &(cmdlistptr->auth_aes_256_cmac);
 
-            auth_cfg = pdev->reg.auth_cfg_cmac_256;
-            key_reg = 8;
-        }
+			auth_cfg = pdev->reg.auth_cfg_cmac_256;
+			key_reg = 8;
+		}
 
-        /* clear status register */
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG, 0,
-                            NULL);
+		/* clear status register */
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG, 0,
+					NULL);
 
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
-                            pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
-        /* 1 dummy write */
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_SIZE_REG,
-                            0, NULL);
-        break;
-    default:
-        pr_err("Unknown algorithms %d received, exiting now\n", alg);
-        return -EINVAL;
-        break;
-    }
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
+			pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
+		/* 1 dummy write */
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_SIZE_REG,
+								0, NULL);
+	break;
+	default:
+		pr_err("Unknown algorithms %d received, exiting now\n", alg);
+		return -EINVAL;
+	break;
+	}
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_SEG_SIZE_REG, 0,
-                        &pcl_info->seg_size);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_CFG_REG, 0,
-                        &pcl_info->encr_seg_cfg);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_CFG_REG,
-                        auth_cfg, &pcl_info->auth_seg_cfg);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_SIZE_REG, 0,
-                        &pcl_info->auth_seg_size);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_START_REG, 0,
-                        &pcl_info->auth_seg_start);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_SEG_SIZE_REG, 0,
+						&pcl_info->seg_size);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_CFG_REG, 0,
+						&pcl_info->encr_seg_cfg);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_CFG_REG,
+					auth_cfg, &pcl_info->auth_seg_cfg);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_SIZE_REG, 0,
+						&pcl_info->auth_seg_size);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_START_REG, 0,
+						&pcl_info->auth_seg_start);
 
-    if (alg == QCE_HASH_AES_CMAC) {
-        /* reset auth iv, bytecount and key  registers */
-        for (i = 0; i < 16; i++)
-            qce_add_cmd_element(pdev, &ce_vaddr,
-                                (CRYPTO_AUTH_IV0_REG + i * sizeof(uint32_t)),
-                                0, NULL);
-        for (i = 0; i < 16; i++)
-            qce_add_cmd_element(pdev, &ce_vaddr,
-                                (CRYPTO_AUTH_KEY0_REG + i*sizeof(uint32_t)),
-                                0, NULL);
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_BYTECNT0_REG,
-                            0, NULL);
-    } else {
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_IV0_REG, 0,
-                            &pcl_info->auth_iv);
-        for (i = 1; i < iv_reg; i++)
-            qce_add_cmd_element(pdev, &ce_vaddr,
-                                (CRYPTO_AUTH_IV0_REG + i*sizeof(uint32_t)),
-                                0, NULL);
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_BYTECNT0_REG,
-                            0, &pcl_info->auth_bytecount);
-    }
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_BYTECNT1_REG, 0, NULL);
+	if (alg == QCE_HASH_AES_CMAC) {
+		/* reset auth iv, bytecount and key  registers */
+		for (i = 0; i < 16; i++)
+			qce_add_cmd_element(pdev, &ce_vaddr,
+				(CRYPTO_AUTH_IV0_REG + i * sizeof(uint32_t)),
+				0, NULL);
+		for (i = 0; i < 16; i++)
+			qce_add_cmd_element(pdev, &ce_vaddr,
+				(CRYPTO_AUTH_KEY0_REG + i*sizeof(uint32_t)),
+				0, NULL);
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_BYTECNT0_REG,
+						0, NULL);
+	} else {
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_IV0_REG, 0,
+							&pcl_info->auth_iv);
+		for (i = 1; i < iv_reg; i++)
+			qce_add_cmd_element(pdev, &ce_vaddr,
+				(CRYPTO_AUTH_IV0_REG + i*sizeof(uint32_t)),
+				0, NULL);
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_BYTECNT0_REG,
+						0, &pcl_info->auth_bytecount);
+	}
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_BYTECNT1_REG, 0, NULL);
 
-    if (key_reg) {
-        qce_add_cmd_element(pdev, &ce_vaddr,
-                            CRYPTO_AUTH_KEY0_REG, 0, &pcl_info->auth_key);
-        for (i = 1; i < key_reg; i++)
-            qce_add_cmd_element(pdev, &ce_vaddr,
-                                (CRYPTO_AUTH_KEY0_REG + i*sizeof(uint32_t)),
-                                0, NULL);
-    }
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
-                        pdev->reg.crypto_cfg_le, NULL);
+	if (key_reg) {
+		qce_add_cmd_element(pdev, &ce_vaddr,
+				CRYPTO_AUTH_KEY0_REG, 0, &pcl_info->auth_key);
+		for (i = 1; i < key_reg; i++)
+			qce_add_cmd_element(pdev, &ce_vaddr,
+				(CRYPTO_AUTH_KEY0_REG + i*sizeof(uint32_t)),
+				0, NULL);
+	}
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
+					pdev->reg.crypto_cfg_le, NULL);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_GOPROC_REG,
-                        ((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP)),
-                        &pcl_info->go_proc);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_GOPROC_REG,
+			((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP) |
+			(1 << CRYPTO_CLR_CNTXT)), &pcl_info->go_proc);
 
-    pcl_info->size = (uint32_t)ce_vaddr - (uint32_t)ce_vaddr_start;
-    *pvaddr = (unsigned char *) ce_vaddr;
+	pcl_info->size = (uint32_t)ce_vaddr - (uint32_t)ce_vaddr_start;
+	*pvaddr = (unsigned char *) ce_vaddr;
 
-    return 0;
+	return 0;
 }
 
 static int _setup_aead_cmdlistptrs(struct qce_device *pdev,
@@ -3427,493 +3428,493 @@ static int _setup_aead_cmdlistptrs(struct qce_device *pdev,
                                    uint32_t mode,
                                    uint32_t key_size)
 {
-    struct sps_command_element *ce_vaddr;
-    uint32_t ce_vaddr_start;
-    struct qce_cmdlistptr_ops *cmdlistptr = &pdev->ce_sps.cmdlistptr;
-    struct qce_cmdlist_info *pcl_info = NULL;
-    uint32_t key_reg;
-    uint32_t iv_reg;
-    uint32_t i;
-    uint32_t  enciv_in_word;
-    uint32_t encr_cfg;
+	struct sps_command_element *ce_vaddr;
+	uint32_t ce_vaddr_start;
+	struct qce_cmdlistptr_ops *cmdlistptr = &pdev->ce_sps.cmdlistptr;
+	struct qce_cmdlist_info *pcl_info = NULL;
+	uint32_t key_reg;
+	uint32_t iv_reg;
+	uint32_t i;
+	uint32_t  enciv_in_word;
+	uint32_t encr_cfg;
 
-    *pvaddr = (unsigned char *) ALIGN(((unsigned int)(*pvaddr)),
-                                      pdev->ce_sps.ce_burst_size);
+	*pvaddr = (unsigned char *) ALIGN(((unsigned int)(*pvaddr)),
+					pdev->ce_sps.ce_burst_size);
 
-    ce_vaddr_start = (uint32_t)(*pvaddr);
-    ce_vaddr = (struct sps_command_element *)(*pvaddr);
+	ce_vaddr_start = (uint32_t)(*pvaddr);
+	ce_vaddr = (struct sps_command_element *)(*pvaddr);
 
-    switch (alg) {
+	switch (alg) {
 
-    case CIPHER_ALG_DES:
+	case CIPHER_ALG_DES:
 
-        switch (mode) {
+		switch (mode) {
 
-        case QCE_MODE_ECB:
-            cmdlistptr->aead_hmac_sha1_ecb_des.cmdlist =
-                (uint32_t)ce_vaddr;
-            pcl_info = &(cmdlistptr->aead_hmac_sha1_ecb_des);
-            encr_cfg = pdev->reg.encr_cfg_des_ecb;
+		case QCE_MODE_ECB:
+			cmdlistptr->aead_hmac_sha1_ecb_des.cmdlist =
+				 (uint32_t)ce_vaddr;
+			pcl_info = &(cmdlistptr->aead_hmac_sha1_ecb_des);
+			encr_cfg = pdev->reg.encr_cfg_des_ecb;
 
-            break;
+			break;
 
-        case QCE_MODE_CBC:
-            cmdlistptr->aead_hmac_sha1_cbc_des.cmdlist =
-                (uint32_t)ce_vaddr;
-            pcl_info = &(cmdlistptr->aead_hmac_sha1_cbc_des);
-            encr_cfg = pdev->reg.encr_cfg_des_cbc;
-            break;
-        default:
-            return -EINVAL;
-        };
+		case QCE_MODE_CBC:
+			cmdlistptr->aead_hmac_sha1_cbc_des.cmdlist =
+				 (uint32_t)ce_vaddr;
+			pcl_info = &(cmdlistptr->aead_hmac_sha1_cbc_des);
+			encr_cfg = pdev->reg.encr_cfg_des_cbc;
+			break;
+		default:
+			return -EINVAL;
+		};
 
-        enciv_in_word = 2;
+		enciv_in_word = 2;
 
-        break;
+		break;
 
-    case CIPHER_ALG_3DES:
-        switch (mode) {
+	case CIPHER_ALG_3DES:
+		switch (mode) {
 
-        case QCE_MODE_ECB:
-            cmdlistptr->aead_hmac_sha1_ecb_3des.cmdlist =
-                (uint32_t)ce_vaddr;
-            pcl_info = &(cmdlistptr->aead_hmac_sha1_ecb_3des);
-            encr_cfg = pdev->reg.encr_cfg_3des_ecb;
+		case QCE_MODE_ECB:
+			cmdlistptr->aead_hmac_sha1_ecb_3des.cmdlist =
+				 (uint32_t)ce_vaddr;
+			pcl_info = &(cmdlistptr->aead_hmac_sha1_ecb_3des);
+			encr_cfg = pdev->reg.encr_cfg_3des_ecb;
 
-            break;
+			break;
 
-        case QCE_MODE_CBC:
-            cmdlistptr->aead_hmac_sha1_cbc_3des.cmdlist =
-                (uint32_t)ce_vaddr;
-            pcl_info = &(cmdlistptr->aead_hmac_sha1_cbc_3des);
-            encr_cfg = pdev->reg.encr_cfg_3des_cbc;
-            break;
-        default:
-            return -EINVAL;
-        };
+		case QCE_MODE_CBC:
+			cmdlistptr->aead_hmac_sha1_cbc_3des.cmdlist =
+				 (uint32_t)ce_vaddr;
+			pcl_info = &(cmdlistptr->aead_hmac_sha1_cbc_3des);
+			encr_cfg = pdev->reg.encr_cfg_3des_cbc;
+			break;
+		default:
+			return -EINVAL;
+		};
 
-        enciv_in_word = 2;
+		enciv_in_word = 2;
 
-        break;
+		break;
 
-    case CIPHER_ALG_AES:
-        switch (mode) {
+	case CIPHER_ALG_AES:
+		switch (mode) {
 
-        case QCE_MODE_ECB:
-            if (key_size ==  AES128_KEY_SIZE) {
-                cmdlistptr->aead_hmac_sha1_ecb_aes_128.cmdlist =
-                    (uint32_t)ce_vaddr;
-                pcl_info = &(cmdlistptr->
-                             aead_hmac_sha1_ecb_aes_128);
+		case QCE_MODE_ECB:
+			if (key_size ==  AES128_KEY_SIZE) {
+				cmdlistptr->aead_hmac_sha1_ecb_aes_128.cmdlist =
+					(uint32_t)ce_vaddr;
+				pcl_info = &(cmdlistptr->
+						aead_hmac_sha1_ecb_aes_128);
 
-                encr_cfg = pdev->reg.encr_cfg_aes_ecb_128;
+				encr_cfg = pdev->reg.encr_cfg_aes_ecb_128;
 
-            } else if (key_size ==  AES256_KEY_SIZE) {
-                cmdlistptr->aead_hmac_sha1_ecb_aes_256.cmdlist =
-                    (uint32_t)ce_vaddr;
-                pcl_info = &(cmdlistptr->
-                             aead_hmac_sha1_ecb_aes_256);
-                encr_cfg = pdev->reg.encr_cfg_aes_ecb_256;
-            } else {
-                return -EINVAL;
-            }
-            break;
+			} else if (key_size ==  AES256_KEY_SIZE) {
+				cmdlistptr->aead_hmac_sha1_ecb_aes_256.cmdlist =
+					(uint32_t)ce_vaddr;
+				pcl_info = &(cmdlistptr->
+						aead_hmac_sha1_ecb_aes_256);
+				encr_cfg = pdev->reg.encr_cfg_aes_ecb_256;
+			} else {
+				return -EINVAL;
+			}
+			break;
 
-        case QCE_MODE_CBC:
-            if (key_size ==  AES128_KEY_SIZE) {
-                cmdlistptr->aead_hmac_sha1_cbc_aes_128.cmdlist =
-                    (uint32_t)ce_vaddr;
-                pcl_info = &(cmdlistptr->
-                             aead_hmac_sha1_cbc_aes_128);
-                encr_cfg = pdev->reg.encr_cfg_aes_cbc_128;
-            } else if (key_size ==  AES256_KEY_SIZE) {
-                cmdlistptr->aead_hmac_sha1_cbc_aes_256.cmdlist =
-                    (uint32_t)ce_vaddr;
-                pcl_info = &(cmdlistptr->
-                             aead_hmac_sha1_cbc_aes_256);
-                encr_cfg = pdev->reg.encr_cfg_aes_cbc_256;
-            } else {
-                return -EINVAL;
-            }
-            break;
-        default:
-            return -EINVAL;
-        };
+		case QCE_MODE_CBC:
+			if (key_size ==  AES128_KEY_SIZE) {
+				cmdlistptr->aead_hmac_sha1_cbc_aes_128.cmdlist =
+					(uint32_t)ce_vaddr;
+				pcl_info = &(cmdlistptr->
+						aead_hmac_sha1_cbc_aes_128);
+				encr_cfg = pdev->reg.encr_cfg_aes_cbc_128;
+			} else if (key_size ==  AES256_KEY_SIZE) {
+				cmdlistptr->aead_hmac_sha1_cbc_aes_256.cmdlist =
+					(uint32_t)ce_vaddr;
+				pcl_info = &(cmdlistptr->
+						aead_hmac_sha1_cbc_aes_256);
+				encr_cfg = pdev->reg.encr_cfg_aes_cbc_256;
+			} else {
+				return -EINVAL;
+			}
+			break;
+		default:
+			return -EINVAL;
+		};
 
-        enciv_in_word = 4;
+		enciv_in_word = 4;
 
-        break;
+		break;
 
-    default:
-        return -EINVAL;
-    };
-
-
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG, 0, NULL);
-
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
-                        pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
+	default:
+		return -EINVAL;
+	};
 
 
-    key_reg = key_size/sizeof(uint32_t);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_KEY0_REG, 0,
-                        &pcl_info->encr_key);
-    for (i = 1; i < key_reg; i++)
-        qce_add_cmd_element(pdev, &ce_vaddr,
-                            (CRYPTO_ENCR_KEY0_REG + i * sizeof(uint32_t)),
-                            0, NULL);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG, 0, NULL);
 
-    if (mode != QCE_MODE_ECB) {
-        qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CNTR0_IV0_REG, 0,
-                            &pcl_info->encr_cntr_iv);
-        for (i = 1; i < enciv_in_word; i++)
-            qce_add_cmd_element(pdev, &ce_vaddr,
-                                (CRYPTO_CNTR0_IV0_REG + i * sizeof(uint32_t)),
-                                0, NULL);
-    };
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
+			pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
 
-    iv_reg = 5;
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_IV0_REG, 0,
-                        &pcl_info->auth_iv);
-    for (i = 1; i < iv_reg; i++)
-        qce_add_cmd_element(pdev, &ce_vaddr,
-                            (CRYPTO_AUTH_IV0_REG + i*sizeof(uint32_t)),
-                            0, NULL);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_BYTECNT0_REG,
-                        0, &pcl_info->auth_bytecount);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_BYTECNT1_REG, 0, NULL);
+	key_reg = key_size/sizeof(uint32_t);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_KEY0_REG, 0,
+			&pcl_info->encr_key);
+	for (i = 1; i < key_reg; i++)
+		qce_add_cmd_element(pdev, &ce_vaddr,
+			(CRYPTO_ENCR_KEY0_REG + i * sizeof(uint32_t)),
+			0, NULL);
 
-    key_reg = SHA_HMAC_KEY_SIZE/sizeof(uint32_t);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_KEY0_REG, 0,
-                        &pcl_info->auth_key);
-    for (i = 1; i < key_reg; i++)
-        qce_add_cmd_element(pdev, &ce_vaddr,
-                            (CRYPTO_AUTH_KEY0_REG + i*sizeof(uint32_t)), 0, NULL);
+	if (mode != QCE_MODE_ECB) {
+		qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CNTR0_IV0_REG, 0,
+			&pcl_info->encr_cntr_iv);
+		for (i = 1; i < enciv_in_word; i++)
+			qce_add_cmd_element(pdev, &ce_vaddr,
+				(CRYPTO_CNTR0_IV0_REG + i * sizeof(uint32_t)),
+				0, NULL);
+	};
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_SEG_SIZE_REG, 0,
-                        &pcl_info->seg_size);
+	iv_reg = 5;
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_IV0_REG, 0,
+				&pcl_info->auth_iv);
+	for (i = 1; i < iv_reg; i++)
+		qce_add_cmd_element(pdev, &ce_vaddr,
+			(CRYPTO_AUTH_IV0_REG + i*sizeof(uint32_t)),
+				0, NULL);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_CFG_REG, encr_cfg,
-                        &pcl_info->encr_seg_cfg);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_SIZE_REG, 0,
-                        &pcl_info->encr_seg_size);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_START_REG, 0,
-                        &pcl_info->encr_seg_start);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_BYTECNT0_REG,
+				0, &pcl_info->auth_bytecount);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_BYTECNT1_REG, 0, NULL);
 
-    qce_add_cmd_element(
-        pdev,
-        &ce_vaddr,
-        CRYPTO_AUTH_SEG_CFG_REG,
-        pdev->reg.auth_cfg_aead_sha1_hmac,
-        &pcl_info->auth_seg_cfg);
+	key_reg = SHA_HMAC_KEY_SIZE/sizeof(uint32_t);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_KEY0_REG, 0,
+			 &pcl_info->auth_key);
+	for (i = 1; i < key_reg; i++)
+		qce_add_cmd_element(pdev, &ce_vaddr,
+			(CRYPTO_AUTH_KEY0_REG + i*sizeof(uint32_t)), 0, NULL);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_SIZE_REG, 0,
-                        &pcl_info->auth_seg_size);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_START_REG, 0,
-                        &pcl_info->auth_seg_start);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_SEG_SIZE_REG, 0,
+			&pcl_info->seg_size);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
-                        pdev->reg.crypto_cfg_le, NULL);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_CFG_REG, encr_cfg,
+			&pcl_info->encr_seg_cfg);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_SIZE_REG, 0,
+			&pcl_info->encr_seg_size);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_START_REG, 0,
+			&pcl_info->encr_seg_start);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_GOPROC_REG,
-                        ((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP)),
-                        &pcl_info->go_proc);
+	qce_add_cmd_element(
+		pdev,
+		&ce_vaddr,
+		CRYPTO_AUTH_SEG_CFG_REG,
+		pdev->reg.auth_cfg_aead_sha1_hmac,
+		&pcl_info->auth_seg_cfg);
 
-    pcl_info->size = (uint32_t)ce_vaddr - (uint32_t)ce_vaddr_start;
-    *pvaddr = (unsigned char *) ce_vaddr;
-    return 0;
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_SIZE_REG, 0,
+			&pcl_info->auth_seg_size);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_START_REG, 0,
+			&pcl_info->auth_seg_start);
+
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
+					pdev->reg.crypto_cfg_le, NULL);
+
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_GOPROC_REG,
+			((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP) |
+			(1 << CRYPTO_CLR_CNTXT)), &pcl_info->go_proc);
+
+	pcl_info->size = (uint32_t)ce_vaddr - (uint32_t)ce_vaddr_start;
+	*pvaddr = (unsigned char *) ce_vaddr;
+	return 0;
 }
 
 static int _setup_aead_ccm_cmdlistptrs(struct qce_device *pdev,
                                        unsigned char **pvaddr, bool key_128)
 {
-    struct sps_command_element *ce_vaddr;
-    uint32_t ce_vaddr_start;
-    struct qce_cmdlistptr_ops *cmdlistptr = &pdev->ce_sps.cmdlistptr;
-    struct qce_cmdlist_info *pcl_info = NULL;
-    int i = 0;
-    uint32_t encr_cfg = 0;
-    uint32_t auth_cfg = 0;
-    uint32_t key_reg = 0;
+	struct sps_command_element *ce_vaddr;
+	uint32_t ce_vaddr_start;
+	struct qce_cmdlistptr_ops *cmdlistptr = &pdev->ce_sps.cmdlistptr;
+	struct qce_cmdlist_info *pcl_info = NULL;
+	int i = 0;
+	uint32_t encr_cfg = 0;
+	uint32_t auth_cfg = 0;
+	uint32_t key_reg = 0;
 
-    *pvaddr = (unsigned char *) ALIGN(((unsigned int)(*pvaddr)),
-                                      pdev->ce_sps.ce_burst_size);
-    ce_vaddr_start = (uint32_t)(*pvaddr);
-    ce_vaddr = (struct sps_command_element *)(*pvaddr);
+	*pvaddr = (unsigned char *) ALIGN(((unsigned int)(*pvaddr)),
+					pdev->ce_sps.ce_burst_size);
+	ce_vaddr_start = (uint32_t)(*pvaddr);
+	ce_vaddr = (struct sps_command_element *)(*pvaddr);
 
-    /*
-     * Designate chunks of the allocated memory to various
-     * command list pointers related to aead operations
-     * defined in ce_cmdlistptrs_ops structure.
-     */
-    if (key_128 == true) {
-        cmdlistptr->aead_aes_128_ccm.cmdlist = (uint32_t)ce_vaddr;
-        pcl_info = &(cmdlistptr->aead_aes_128_ccm);
+	/*
+	 * Designate chunks of the allocated memory to various
+	 * command list pointers related to aead operations
+	 * defined in ce_cmdlistptrs_ops structure.
+	 */
+	if (key_128 == true) {
+		cmdlistptr->aead_aes_128_ccm.cmdlist = (uint32_t)ce_vaddr;
+		pcl_info = &(cmdlistptr->aead_aes_128_ccm);
 
-        auth_cfg = pdev->reg.auth_cfg_aes_ccm_128;
-        encr_cfg = pdev->reg.encr_cfg_aes_ccm_128;
-        key_reg = 4;
-    } else {
+		auth_cfg = pdev->reg.auth_cfg_aes_ccm_128;
+		encr_cfg = pdev->reg.encr_cfg_aes_ccm_128;
+		key_reg = 4;
+	} else {
 
-        cmdlistptr->aead_aes_256_ccm.cmdlist = (uint32_t)ce_vaddr;
-        pcl_info = &(cmdlistptr->aead_aes_256_ccm);
+		cmdlistptr->aead_aes_256_ccm.cmdlist = (uint32_t)ce_vaddr;
+		pcl_info = &(cmdlistptr->aead_aes_256_ccm);
 
-        auth_cfg = pdev->reg.auth_cfg_aes_ccm_256;
-        encr_cfg = pdev->reg.encr_cfg_aes_ccm_256;
+		auth_cfg = pdev->reg.auth_cfg_aes_ccm_256;
+		encr_cfg = pdev->reg.encr_cfg_aes_ccm_256;
 
-        key_reg = 8;
-    }
+		key_reg = 8;
+	}
 
-    /* clear status register */
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG, 0, NULL);
+	/* clear status register */
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG, 0, NULL);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
-                        pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
+			pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_CFG_REG, 0, NULL);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_START_REG, 0,
-                        NULL);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_SEG_SIZE_REG, 0,
-                        &pcl_info->seg_size);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_CFG_REG,
-                        encr_cfg, &pcl_info->encr_seg_cfg);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_SIZE_REG, 0,
-                        &pcl_info->encr_seg_size);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_START_REG, 0,
-                        &pcl_info->encr_seg_start);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CNTR_MASK_REG,
-                        (uint32_t)0xffffffff, &pcl_info->encr_mask);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_CFG_REG,
-                        auth_cfg, &pcl_info->auth_seg_cfg);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_SIZE_REG, 0,
-                        &pcl_info->auth_seg_size);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_START_REG, 0,
-                        &pcl_info->auth_seg_start);
-    /* reset auth iv, bytecount and key  registers */
-    for (i = 0; i < 8; i++)
-        qce_add_cmd_element(pdev, &ce_vaddr,
-                            (CRYPTO_AUTH_IV0_REG + i * sizeof(uint32_t)),
-                            0, NULL);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_BYTECNT0_REG,
-                        0, NULL);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_BYTECNT1_REG,
-                        0, NULL);
-    for (i = 0; i < 16; i++)
-        qce_add_cmd_element(pdev, &ce_vaddr,
-                            (CRYPTO_AUTH_KEY0_REG + i * sizeof(uint32_t)),
-                            0, NULL);
-    /* set auth key */
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_KEY0_REG, 0,
-                        &pcl_info->auth_key);
-    for (i = 1; i < key_reg; i++)
-        qce_add_cmd_element(pdev, &ce_vaddr,
-                            (CRYPTO_AUTH_KEY0_REG + i * sizeof(uint32_t)),
-                            0, NULL);
-    /* set NONCE info */
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_INFO_NONCE0_REG, 0,
-                        &pcl_info->auth_nonce_info);
-    for (i = 1; i < 4; i++)
-        qce_add_cmd_element(pdev, &ce_vaddr,
-                            (CRYPTO_AUTH_INFO_NONCE0_REG +
-                             i * sizeof(uint32_t)), 0, NULL);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_CFG_REG, 0, NULL);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_START_REG, 0,
+									NULL);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_SEG_SIZE_REG, 0,
+						&pcl_info->seg_size);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_CFG_REG,
+					encr_cfg, &pcl_info->encr_seg_cfg);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_SIZE_REG, 0,
+						&pcl_info->encr_seg_size);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_START_REG, 0,
+						&pcl_info->encr_seg_start);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CNTR_MASK_REG,
+				(uint32_t)0xffffffff, &pcl_info->encr_mask);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_CFG_REG,
+					auth_cfg, &pcl_info->auth_seg_cfg);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_SIZE_REG, 0,
+						&pcl_info->auth_seg_size);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_START_REG, 0,
+						&pcl_info->auth_seg_start);
+	/* reset auth iv, bytecount and key  registers */
+	for (i = 0; i < 8; i++)
+		qce_add_cmd_element(pdev, &ce_vaddr,
+				(CRYPTO_AUTH_IV0_REG + i * sizeof(uint32_t)),
+				0, NULL);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_BYTECNT0_REG,
+					0, NULL);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_BYTECNT1_REG,
+					0, NULL);
+	for (i = 0; i < 16; i++)
+		qce_add_cmd_element(pdev, &ce_vaddr,
+				(CRYPTO_AUTH_KEY0_REG + i * sizeof(uint32_t)),
+				0, NULL);
+	/* set auth key */
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_KEY0_REG, 0,
+							&pcl_info->auth_key);
+	for (i = 1; i < key_reg; i++)
+		qce_add_cmd_element(pdev, &ce_vaddr,
+				(CRYPTO_AUTH_KEY0_REG + i * sizeof(uint32_t)),
+				0, NULL);
+	/* set NONCE info */
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_INFO_NONCE0_REG, 0,
+						&pcl_info->auth_nonce_info);
+	for (i = 1; i < 4; i++)
+		qce_add_cmd_element(pdev, &ce_vaddr,
+				(CRYPTO_AUTH_INFO_NONCE0_REG +
+				i * sizeof(uint32_t)), 0, NULL);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_KEY0_REG, 0,
-                        &pcl_info->encr_key);
-    for (i = 1; i < key_reg; i++)
-        qce_add_cmd_element(pdev, &ce_vaddr,
-                            (CRYPTO_ENCR_KEY0_REG + i * sizeof(uint32_t)),
-                            0, NULL);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CNTR0_IV0_REG, 0,
-                        &pcl_info->encr_cntr_iv);
-    for (i = 1; i < 4; i++)
-        qce_add_cmd_element(pdev, &ce_vaddr,
-                            (CRYPTO_CNTR0_IV0_REG + i * sizeof(uint32_t)),
-                            0, NULL);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_CCM_INT_CNTR0_REG, 0,
-                        &pcl_info->encr_ccm_cntr_iv);
-    for (i = 1; i < 4; i++)
-        qce_add_cmd_element(pdev, &ce_vaddr,
-                            (CRYPTO_ENCR_CCM_INT_CNTR0_REG + i * sizeof(uint32_t)),
-                            0, NULL);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_KEY0_REG, 0,
+						&pcl_info->encr_key);
+	for (i = 1; i < key_reg; i++)
+		qce_add_cmd_element(pdev, &ce_vaddr,
+				(CRYPTO_ENCR_KEY0_REG + i * sizeof(uint32_t)),
+				0, NULL);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CNTR0_IV0_REG, 0,
+						&pcl_info->encr_cntr_iv);
+	for (i = 1; i < 4; i++)
+		qce_add_cmd_element(pdev, &ce_vaddr,
+				(CRYPTO_CNTR0_IV0_REG + i * sizeof(uint32_t)),
+				0, NULL);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_CCM_INT_CNTR0_REG, 0,
+						&pcl_info->encr_ccm_cntr_iv);
+	for (i = 1; i < 4; i++)
+		qce_add_cmd_element(pdev, &ce_vaddr,
+			(CRYPTO_ENCR_CCM_INT_CNTR0_REG + i * sizeof(uint32_t)),
+			0, NULL);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
-                        pdev->reg.crypto_cfg_le, NULL);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
+					pdev->reg.crypto_cfg_le, NULL);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_GOPROC_REG,
-                        ((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP)),
-                        &pcl_info->go_proc);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_GOPROC_REG,
+			((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP) |
+			(1 << CRYPTO_CLR_CNTXT)), &pcl_info->go_proc);
 
-    pcl_info->size = (uint32_t)ce_vaddr - (uint32_t)ce_vaddr_start;
-    *pvaddr = (unsigned char *) ce_vaddr;
+	pcl_info->size = (uint32_t)ce_vaddr - (uint32_t)ce_vaddr_start;
+	*pvaddr = (unsigned char *) ce_vaddr;
 
-    return 0;
+	return 0;
 }
 
 static int _setup_f8_cmdlistptrs(struct qce_device *pdev,
                                  unsigned char **pvaddr, enum qce_ota_algo_enum alg)
 {
-    struct sps_command_element *ce_vaddr;
-    uint32_t ce_vaddr_start;
-    struct qce_cmdlistptr_ops *cmdlistptr = &pdev->ce_sps.cmdlistptr;
-    struct qce_cmdlist_info *pcl_info = NULL;
-    int i = 0;
-    uint32_t encr_cfg = 0;
-    uint32_t key_reg = 4;
+	struct sps_command_element *ce_vaddr;
+	uint32_t ce_vaddr_start;
+	struct qce_cmdlistptr_ops *cmdlistptr = &pdev->ce_sps.cmdlistptr;
+	struct qce_cmdlist_info *pcl_info = NULL;
+	int i = 0;
+	uint32_t encr_cfg = 0;
+	uint32_t key_reg = 4;
 
-    *pvaddr = (unsigned char *) ALIGN(((unsigned int)(*pvaddr)),
-                                      pdev->ce_sps.ce_burst_size);
-    ce_vaddr = (struct sps_command_element *)(*pvaddr);
-    ce_vaddr_start = (uint32_t)(*pvaddr);
+	*pvaddr = (unsigned char *) ALIGN(((unsigned int)(*pvaddr)),
+					pdev->ce_sps.ce_burst_size);
+	ce_vaddr = (struct sps_command_element *)(*pvaddr);
+	ce_vaddr_start = (uint32_t)(*pvaddr);
 
-    /*
-     * Designate chunks of the allocated memory to various
-     * command list pointers related to f8 cipher algorithm defined
-     * in ce_cmdlistptrs_ops structure.
-     */
+	/*
+	 * Designate chunks of the allocated memory to various
+	 * command list pointers related to f8 cipher algorithm defined
+	 * in ce_cmdlistptrs_ops structure.
+	 */
 
-    switch (alg) {
-    case QCE_OTA_ALGO_KASUMI:
-        cmdlistptr->f8_kasumi.cmdlist = (uint32_t)ce_vaddr;
-        pcl_info = &(cmdlistptr->f8_kasumi);
-        encr_cfg = pdev->reg.encr_cfg_kasumi;
-        break;
+	switch (alg) {
+	case QCE_OTA_ALGO_KASUMI:
+		cmdlistptr->f8_kasumi.cmdlist = (uint32_t)ce_vaddr;
+		pcl_info = &(cmdlistptr->f8_kasumi);
+		encr_cfg = pdev->reg.encr_cfg_kasumi;
+		break;
 
-    case QCE_OTA_ALGO_SNOW3G:
-    default:
-        cmdlistptr->f8_snow3g.cmdlist = (uint32_t)ce_vaddr;
-        pcl_info = &(cmdlistptr->f8_snow3g);
-        encr_cfg = pdev->reg.encr_cfg_snow3g;
-        break;
-    }
-    /* clear status register */
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG,
-                        0, NULL);
-    /* set config to big endian */
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
-                        pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
+	case QCE_OTA_ALGO_SNOW3G:
+	default:
+		cmdlistptr->f8_snow3g.cmdlist = (uint32_t)ce_vaddr;
+		pcl_info = &(cmdlistptr->f8_snow3g);
+		encr_cfg = pdev->reg.encr_cfg_snow3g;
+		break;
+	}
+	/* clear status register */
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG,
+							0, NULL);
+	/* set config to big endian */
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
+			pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_SEG_SIZE_REG, 0,
-                        &pcl_info->seg_size);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_SEG_SIZE_REG, 0,
+						&pcl_info->seg_size);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_CFG_REG, encr_cfg,
-                        &pcl_info->encr_seg_cfg);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_SIZE_REG, 0,
-                        &pcl_info->encr_seg_size);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_START_REG, 0,
-                        &pcl_info->encr_seg_start);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_CFG_REG, encr_cfg,
+						&pcl_info->encr_seg_cfg);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_SIZE_REG, 0,
+						&pcl_info->encr_seg_size);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_START_REG, 0,
+						&pcl_info->encr_seg_start);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_CFG_REG, 0,
-                        &pcl_info->auth_seg_cfg);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_CFG_REG, 0,
+						&pcl_info->auth_seg_cfg);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_SIZE_REG,
-                        0, &pcl_info->auth_seg_size);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_START_REG,
-                        0, &pcl_info->auth_seg_start);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_SIZE_REG,
+						0, &pcl_info->auth_seg_size);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_START_REG,
+						0, &pcl_info->auth_seg_start);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_KEY0_REG, 0,
-                        &pcl_info->encr_key);
-    for (i = 1; i < key_reg; i++)
-        qce_add_cmd_element(pdev, &ce_vaddr,
-                            (CRYPTO_ENCR_KEY0_REG + i * sizeof(uint32_t)),
-                            0, NULL);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_KEY0_REG, 0,
+						 &pcl_info->encr_key);
+	for (i = 1; i < key_reg; i++)
+		qce_add_cmd_element(pdev, &ce_vaddr,
+				(CRYPTO_ENCR_KEY0_REG + i * sizeof(uint32_t)),
+				0, NULL);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CNTR0_IV0_REG, 0,
-                        &pcl_info->encr_cntr_iv);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CNTR1_IV1_REG, 0,
-                        NULL);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
-                        pdev->reg.crypto_cfg_le, NULL);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CNTR0_IV0_REG, 0,
+						&pcl_info->encr_cntr_iv);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CNTR1_IV1_REG, 0,
+								NULL);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
+					pdev->reg.crypto_cfg_le, NULL);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_GOPROC_REG,
-                        ((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP)),
-                        &pcl_info->go_proc);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_GOPROC_REG,
+			((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP) |
+			(1 << CRYPTO_CLR_CNTXT)), &pcl_info->go_proc);
 
-    pcl_info->size = (uint32_t)ce_vaddr - (uint32_t)ce_vaddr_start;
-    *pvaddr = (unsigned char *) ce_vaddr;
+	pcl_info->size = (uint32_t)ce_vaddr - (uint32_t)ce_vaddr_start;
+	*pvaddr = (unsigned char *) ce_vaddr;
 
-    return 0;
+	return 0;
 }
 
 static int _setup_f9_cmdlistptrs(struct qce_device *pdev,
                                  unsigned char **pvaddr, enum qce_ota_algo_enum alg)
 {
-    struct sps_command_element *ce_vaddr;
-    uint32_t ce_vaddr_start;
-    struct qce_cmdlistptr_ops *cmdlistptr = &pdev->ce_sps.cmdlistptr;
-    struct qce_cmdlist_info *pcl_info = NULL;
-    int i = 0;
-    uint32_t auth_cfg = 0;
-    uint32_t iv_reg = 0;
+	struct sps_command_element *ce_vaddr;
+	uint32_t ce_vaddr_start;
+	struct qce_cmdlistptr_ops *cmdlistptr = &pdev->ce_sps.cmdlistptr;
+	struct qce_cmdlist_info *pcl_info = NULL;
+	int i = 0;
+	uint32_t auth_cfg = 0;
+	uint32_t iv_reg = 0;
 
-    *pvaddr = (unsigned char *) ALIGN(((unsigned int)(*pvaddr)),
-                                      pdev->ce_sps.ce_burst_size);
-    ce_vaddr_start = (uint32_t)(*pvaddr);
-    ce_vaddr = (struct sps_command_element *)(*pvaddr);
+	*pvaddr = (unsigned char *) ALIGN(((unsigned int)(*pvaddr)),
+					pdev->ce_sps.ce_burst_size);
+	ce_vaddr_start = (uint32_t)(*pvaddr);
+	ce_vaddr = (struct sps_command_element *)(*pvaddr);
 
-    /*
-     * Designate chunks of the allocated memory to various
-     * command list pointers related to authentication operations
-     * defined in ce_cmdlistptrs_ops structure.
-     */
-    switch (alg) {
-    case QCE_OTA_ALGO_KASUMI:
-        cmdlistptr->f9_kasumi.cmdlist = (uint32_t)ce_vaddr;
-        pcl_info = &(cmdlistptr->f9_kasumi);
-        auth_cfg = pdev->reg.auth_cfg_kasumi;
-        break;
+	/*
+	 * Designate chunks of the allocated memory to various
+	 * command list pointers related to authentication operations
+	 * defined in ce_cmdlistptrs_ops structure.
+	 */
+	switch (alg) {
+	case QCE_OTA_ALGO_KASUMI:
+		cmdlistptr->f9_kasumi.cmdlist = (uint32_t)ce_vaddr;
+		pcl_info = &(cmdlistptr->f9_kasumi);
+		auth_cfg = pdev->reg.auth_cfg_kasumi;
+		break;
 
-    case QCE_OTA_ALGO_SNOW3G:
-    default:
-        cmdlistptr->f9_snow3g.cmdlist = (uint32_t)ce_vaddr;
-        pcl_info = &(cmdlistptr->f9_snow3g);
-        auth_cfg = pdev->reg.auth_cfg_snow3g;
-    };
+	case QCE_OTA_ALGO_SNOW3G:
+	default:
+		cmdlistptr->f9_snow3g.cmdlist = (uint32_t)ce_vaddr;
+		pcl_info = &(cmdlistptr->f9_snow3g);
+		auth_cfg = pdev->reg.auth_cfg_snow3g;
+	};
 
-    /* clear status register */
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG,
-                        0, NULL);
-    /* set config to big endian */
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
-                        pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
+	/* clear status register */
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_STATUS_REG,
+							0, NULL);
+	/* set config to big endian */
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
+			pdev->reg.crypto_cfg_be, &pcl_info->crypto_cfg);
 
-    iv_reg = 5;
+	iv_reg = 5;
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_SEG_SIZE_REG, 0,
-                        &pcl_info->seg_size);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_SEG_SIZE_REG, 0,
+						&pcl_info->seg_size);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_CFG_REG, 0,
-                        &pcl_info->encr_seg_cfg);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_ENCR_SEG_CFG_REG, 0,
+						&pcl_info->encr_seg_cfg);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_CFG_REG,
-                        auth_cfg, &pcl_info->auth_seg_cfg);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_SIZE_REG, 0,
-                        &pcl_info->auth_seg_size);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_START_REG, 0,
-                        &pcl_info->auth_seg_start);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_CFG_REG,
+					auth_cfg, &pcl_info->auth_seg_cfg);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_SIZE_REG, 0,
+						&pcl_info->auth_seg_size);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_SEG_START_REG, 0,
+						&pcl_info->auth_seg_start);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_IV0_REG, 0,
-                        &pcl_info->auth_iv);
-    for (i = 1; i < iv_reg; i++) {
-        qce_add_cmd_element(pdev, &ce_vaddr,
-                            (CRYPTO_AUTH_IV0_REG + i*sizeof(uint32_t)),
-                            0, NULL);
-    }
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_BYTECNT0_REG,
-                        0, &pcl_info->auth_bytecount);
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_BYTECNT1_REG, 0, NULL);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_IV0_REG, 0,
+							&pcl_info->auth_iv);
+	for (i = 1; i < iv_reg; i++) {
+		qce_add_cmd_element(pdev, &ce_vaddr,
+				(CRYPTO_AUTH_IV0_REG + i*sizeof(uint32_t)),
+				0, NULL);
+	}
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_BYTECNT0_REG,
+					0, &pcl_info->auth_bytecount);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_AUTH_BYTECNT1_REG, 0, NULL);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
-                        pdev->reg.crypto_cfg_le, NULL);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_CONFIG_REG,
+					pdev->reg.crypto_cfg_le, NULL);
 
-    qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_GOPROC_REG,
-                        ((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP)),
-                        &pcl_info->go_proc);
+	qce_add_cmd_element(pdev, &ce_vaddr, CRYPTO_GOPROC_REG,
+			((1 << CRYPTO_GO) | (1 << CRYPTO_RESULTS_DUMP) |
+			(1 << CRYPTO_CLR_CNTXT)), &pcl_info->go_proc);
 
-    pcl_info->size = (uint32_t)ce_vaddr - (uint32_t)ce_vaddr_start;
-    *pvaddr = (unsigned char *) ce_vaddr;
+	pcl_info->size = (uint32_t)ce_vaddr - (uint32_t)ce_vaddr_start;
+	*pvaddr = (unsigned char *) ce_vaddr;
 
-    return 0;
+	return 0;
 }
 
 static int _setup_unlock_pipe_cmdlistptrs(struct qce_device *pdev,
