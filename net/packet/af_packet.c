@@ -3129,101 +3129,101 @@ packet_setsockopt(struct socket *sock, int level, int optname, char __user *optv
 			po->tp_version = val;
 			ret = 0;
 		}
-		release_sock(sk);
-		return ret;
-    }
-    case PACKET_RESERVE:
-    {
-        unsigned int val;
+	}
+	case PACKET_RESERVE:
+	{
+		unsigned int val;
 
-        if (optlen != sizeof(val))
-            return -EINVAL;
-        if (po->rx_ring.pg_vec || po->tx_ring.pg_vec)
-            return -EBUSY;
-        if (copy_from_user(&val, optval, sizeof(val)))
-            return -EFAULT;
-        po->tp_reserve = val;
-        return 0;
-    }
-    case PACKET_LOSS:
-    {
-        unsigned int val;
+		if (optlen != sizeof(val))
+			return -EINVAL;
+		if (po->rx_ring.pg_vec || po->tx_ring.pg_vec)
+			return -EBUSY;
+		if (copy_from_user(&val, optval, sizeof(val)))
+			return -EFAULT;
+		if (val > INT_MAX)
+			return -EINVAL;
+		po->tp_reserve = val;
+		return 0;
+	}
+	case PACKET_LOSS:
+	{
+		unsigned int val;
 
-        if (optlen != sizeof(val))
-            return -EINVAL;
-        if (po->rx_ring.pg_vec || po->tx_ring.pg_vec)
-            return -EBUSY;
-        if (copy_from_user(&val, optval, sizeof(val)))
-            return -EFAULT;
-        po->tp_loss = !!val;
-        return 0;
-    }
-    case PACKET_AUXDATA:
-    {
-        int val;
+		if (optlen != sizeof(val))
+			return -EINVAL;
+		if (po->rx_ring.pg_vec || po->tx_ring.pg_vec)
+			return -EBUSY;
+		if (copy_from_user(&val, optval, sizeof(val)))
+			return -EFAULT;
+		po->tp_loss = !!val;
+		return 0;
+	}
+	case PACKET_AUXDATA:
+	{
+		int val;
 
-        if (optlen < sizeof(val))
-            return -EINVAL;
-        if (copy_from_user(&val, optval, sizeof(val)))
-            return -EFAULT;
+		if (optlen < sizeof(val))
+			return -EINVAL;
+		if (copy_from_user(&val, optval, sizeof(val)))
+			return -EFAULT;
 
-        po->auxdata = !!val;
-        return 0;
-    }
-    case PACKET_ORIGDEV:
-    {
-        int val;
+		po->auxdata = !!val;
+		return 0;
+	}
+	case PACKET_ORIGDEV:
+	{
+		int val;
 
-        if (optlen < sizeof(val))
-            return -EINVAL;
-        if (copy_from_user(&val, optval, sizeof(val)))
-            return -EFAULT;
+		if (optlen < sizeof(val))
+			return -EINVAL;
+		if (copy_from_user(&val, optval, sizeof(val)))
+			return -EFAULT;
 
-        po->origdev = !!val;
-        return 0;
-    }
-    case PACKET_VNET_HDR:
-    {
-        int val;
+		po->origdev = !!val;
+		return 0;
+	}
+	case PACKET_VNET_HDR:
+	{
+		int val;
 
-        if (sock->type != SOCK_RAW)
-            return -EINVAL;
-        if (po->rx_ring.pg_vec || po->tx_ring.pg_vec)
-            return -EBUSY;
-        if (optlen < sizeof(val))
-            return -EINVAL;
-        if (copy_from_user(&val, optval, sizeof(val)))
-            return -EFAULT;
+		if (sock->type != SOCK_RAW)
+			return -EINVAL;
+		if (po->rx_ring.pg_vec || po->tx_ring.pg_vec)
+			return -EBUSY;
+		if (optlen < sizeof(val))
+			return -EINVAL;
+		if (copy_from_user(&val, optval, sizeof(val)))
+			return -EFAULT;
 
-        po->has_vnet_hdr = !!val;
-        return 0;
-    }
-    case PACKET_TIMESTAMP:
-    {
-        int val;
+		po->has_vnet_hdr = !!val;
+		return 0;
+	}
+	case PACKET_TIMESTAMP:
+	{
+		int val;
 
-        if (optlen != sizeof(val))
-            return -EINVAL;
-        if (copy_from_user(&val, optval, sizeof(val)))
-            return -EFAULT;
+		if (optlen != sizeof(val))
+			return -EINVAL;
+		if (copy_from_user(&val, optval, sizeof(val)))
+			return -EFAULT;
 
-        po->tp_tstamp = val;
-        return 0;
-    }
-    case PACKET_FANOUT:
-    {
-        int val;
+		po->tp_tstamp = val;
+		return 0;
+	}
+	case PACKET_FANOUT:
+	{
+		int val;
 
-        if (optlen != sizeof(val))
-            return -EINVAL;
-        if (copy_from_user(&val, optval, sizeof(val)))
-            return -EFAULT;
+		if (optlen != sizeof(val))
+			return -EINVAL;
+		if (copy_from_user(&val, optval, sizeof(val)))
+			return -EFAULT;
 
-        return fanout_add(sk, val & 0xffff, val >> 16);
-    }
-    default:
-        return -ENOPROTOOPT;
-    }
+		return fanout_add(sk, val & 0xffff, val >> 16);
+	}
+	default:
+		return -ENOPROTOOPT;
+	}
 }
 
 static int packet_getsockopt(struct socket *sock, int level, int optname,
