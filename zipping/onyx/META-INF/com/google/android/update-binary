@@ -168,11 +168,6 @@ if [ ! -d BlackReactor ]; then
 	ui_print " |- Making Directories.."
 	mkdir BlackReactor;
 fi;
-ui_print "[*] Adding Ad-blocker..."
-rm -rf /system/etc/hosts
-cp -f /tmp/anykernel/system/hosts /system/etc/hosts;
-chmod 644 /system/etc/hosts;
-chown 0:0 /system/etc/hosts;
 
 mount -o remount,rw /system
 mkdir /system/su.d
