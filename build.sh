@@ -29,12 +29,12 @@ nocol='\033[0m'
 KERNEL_DIR=$PWD
 KERN_IMG=$KERNEL_DIR/arch/arm/boot/zImage-dtb
 OUT_DIR=$KERNEL_DIR/zipping/onyx
-REACTOR_VERSION="OOS-stable-0.4"
+REACTOR_VERSION="OOS-beta-112"
 MODULES_DIR=$KERNEL_DIR/zipping/common
-STRIP="ccache /home/nachiket/Android/onyx/kernel/toolchains/ubertc/4.9/bin/arm-linux-androideabi-strip"
+STRIP="ccache /home/nachiket/Android/onyx/kernel/toolchains/4.9/bin/arm-linux-androideabi-strip"
 # Device Spceifics
 export ARCH=arm
-export CROSS_COMPILE="ccache /home/nachiket/Android/onyx/kernel/toolchains/ubertc/4.9/bin/arm-linux-androideabi-"
+export CROSS_COMPILE="ccache /home/nachiket/Android/onyx/kernel/toolchains/4.9/bin/arm-linux-androideabi-"
 export KBUILD_BUILD_USER="nachiket"
 export KBUILD_BUILD_HOST="reactor"
 
@@ -101,3 +101,4 @@ BUILD_END=$(date +"%s")
 DIFF=$(($BUILD_END - $BUILD_START))
 echo -e "$blue Build completed in $(($DIFF / 60)) minute(s) and $(($DIFF % 60)) seconds.$nocol"
 echo -e "$red zImage size (bytes): $(stat -c%s $KERN_IMG) $nocol"
+notify-send "Compilation Has Finished!"
