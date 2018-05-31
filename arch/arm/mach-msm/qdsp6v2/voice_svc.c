@@ -173,10 +173,7 @@ static int voice_svc_send_req(struct voice_svc_cmd_request *apr_request,
 	void *apr_handle = NULL;
 	struct apr_data *aprdata = NULL;
 	uint32_t user_payload_size = 0;
-<<<<<<< HEAD
-=======
 	uint32_t payload_size = 0;
->>>>>>> 34ad96596e9... drivers: soc: Add buffer overflow check for svc send request
 
 	if (apr_request == NULL) {
 		pr_err("%s: apr_request is NULL\n", __func__);
@@ -186,17 +183,6 @@ static int voice_svc_send_req(struct voice_svc_cmd_request *apr_request,
 	}
 
 	user_payload_size = apr_request->payload_size;
-
-<<<<<<< HEAD
-	aprdata = kmalloc(sizeof(struct apr_data) + user_payload_size,
-			  GFP_KERNEL);
-
-	if (aprdata == NULL) {
-		pr_err("%s: aprdata kmalloc failed.", __func__);
-
-		ret = -ENOMEM;
-		goto done;
-=======
 	if (payload_size <= user_payload_size) {
 		pr_err("%s: invalid payload size ( 0x%x ).\n",
 		__func__, user_payload_size);
@@ -208,7 +194,6 @@ static int voice_svc_send_req(struct voice_svc_cmd_request *apr_request,
 			ret = -ENOMEM;
 			goto done;
 		}
->>>>>>> 34ad96596e9... drivers: soc: Add buffer overflow check for svc send request
 	}
 
 
@@ -384,17 +369,6 @@ static long voice_svc_ioctl(struct file *file, unsigned int cmd,
 
 		user_payload_size =
 			((struct voice_svc_cmd_request*)arg)->payload_size;
-<<<<<<< HEAD
-
-		apr_request = kmalloc(sizeof(struct voice_svc_cmd_request) +
-				      user_payload_size, GFP_KERNEL);
-
-		if (apr_request == NULL) {
-			pr_err("%s: apr_request kmalloc failed.", __func__);
-
-			ret = -ENOMEM;
-			goto done;
-=======
 		payload_size = sizeof(struct voice_svc_cmd_request) + user_payload_size;
 		if (payload_size <= user_payload_size) {
 			pr_err("%s: invalid payload size ( 0x%x ).\n",
@@ -407,7 +381,6 @@ static long voice_svc_ioctl(struct file *file, unsigned int cmd,
 				ret = -ENOMEM;
 				goto done;
 			}
->>>>>>> 34ad96596e9... drivers: soc: Add buffer overflow check for svc send request
 		}
 
 
